@@ -10,10 +10,16 @@
 
 DEFINE_LOG_CATEGORY_STATIC(BotSystem, Log, All)
 
-void BotsSystem::Update(UWorld* World, TArray<FBotParam> BotsParams, FPuckParam PuckParams)
+void BotsSystem::Update(UWorld* World, ATriggerBox* MatchAreaBox, float DeltaTime, APlayerController* PC, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams)
 {
 	UpdateBotsDebug(World, BotsParams);
-	//UpdatePuckDebug(World, PuckParams);
+	UpdatePuckDebug(World, PuckParams);
+	
+	/*if (PuckParams.IsControlled)
+	{
+		UpdatePuckPosition(DeltaTime, MatchAreaBox, World, PC, PuckParams);
+	}
+	UpdateBotsPosition(DeltaTime, MatchAreaBox, World, BotsParams, PuckParams);*/
 }
 
 void BotsSystem::Init(UWorld* World, APlayerController* PC, EIHMatchRulesMode Rules, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams, AGlobalCamera*& GlobalCamera, ATriggerBox*& MatchAreaBox, EIHMatchGameMode MatchGameMode, ETeam GoalToTeam)
@@ -39,7 +45,6 @@ void BotsSystem::Init(UWorld* World, APlayerController* PC, EIHMatchRulesMode Ru
 			SetPuckParams(MatchAreaBox, PuckParams);
 			SetRules(Rules, MatchAreaBox, BotsParams, MatchGameMode, GoalToTeam);
 			
-			//testfunc(World, MatchAreaBox);
 		}
 	}
 }
@@ -274,12 +279,12 @@ void BotsSystem::SetBotsDefaultPositions(ATriggerBox* MatchAreaBox, EIHMatchGame
 		{
 			case ETeam::Team1:
 				BotsParamsArray[i].Position = PointsOnBlueLineTeam1[i/2];
-				Direction = (LookPoint - PointsOnBlueLineTeam1[i/2]).GetSafeNormal();
+				Direction = (LookPoint - BotsParamsArray[i].Position).GetSafeNormal();
 				BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
 				break;
 			case ETeam::Team2:
 				BotsParamsArray[i].Position = PointsOnBlueLineTeam2[i/2];
-				Direction = (LookPoint - PointsOnBlueLineTeam2[i/2]).GetSafeNormal();
+				Direction = (LookPoint - BotsParamsArray[i].Position).GetSafeNormal();
 				BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
 				break;
 		}
@@ -360,92 +365,6 @@ void BotsSystem::DrawDirectionDebug(UWorld* World, FBotParam BotsParams, FColor 
 	FVector Point3 = Center - RightVector * Radius;
 	
 	DrawDebugMesh(World, Verts, Indices, Color, false, Duration);
-}
-
-void BotsSystem::FindMouseClickPosition(UWorld* World, APlayerController* PC, ABaseGameMode* GameMode)
-{
-	float MouseX, MouseY;
-	PC->GetMousePosition(MouseX, MouseY);
-	
-	FVector CamLoc;
-	FRotator CamRot;
-	PC->GetPlayerViewPoint(CamLoc, CamRot);
-	
-
-	const FVector Forward = CamRot.Vector();
-	const FVector Right = FRotationMatrix(CamRot).GetScaledAxis(EAxis::Y);
-	const FVector Up = FRotationMatrix(CamRot).GetScaledAxis(EAxis::Z); 
-
-	int32 SizeX, SizeY;
-	PC->GetViewportSize(SizeX, SizeY);
-
-	const float NDC_X = (MouseX / SizeX) * 2.f - 1.f;
-	const float NDC_Y = -(MouseY / SizeY) * 2.f + 1.f;
-
-	FVector RayDir =
-		Forward +
-		Right * NDC_X +
-		(Up * (static_cast<float>(SizeY)/static_cast<float>(SizeX))) * NDC_Y;
-
-	RayDir.Normalize();
-
-	const FVector PlanePoint = FVector(0, 0, 0);  
-	const FVector PlaneNormal = FVector::UpVector;
-
-	const float Denom = FVector::DotProduct(PlaneNormal, RayDir);
-
-	if (FMath::Abs(Denom) > KINDA_SMALL_NUMBER)
-	{
-		const float T = FVector::DotProduct(
-			PlanePoint - CamLoc,
-			PlaneNormal
-		) / Denom;
-
-		if (T >= 0)
-		{
-			const FVector ClickWorldPos = CamLoc + RayDir * T;
-
-			CheckClickDistance(ClickWorldPos, GameMode->GameModeParams.BotsParamArray, GameMode->GameModeParams.PuckParam);
-
-			
-			float Duration = 2.f;
-			float Size = 10.f;
-
-			DrawDebugPoint(
-				World,
-				ClickWorldPos,
-				Size,
-				FColor::Yellow,
-				false,
-				Duration,
-				0);
-		}
-	}
-}
-
-void BotsSystem::CheckClickDistance(FVector ClickPosition, TArray<FBotParam>& BotsParams, FPuckParam& PuckParam)
-{
-	if(FVector::Distance(PuckParam.Position, ClickPosition) < 30)
-	{
-		PuckParam.IsControlled = true;
-	}
-	else
-	{
-		PuckParam.IsControlled = false;
-	}
-	
-	for (int i = 0; i < BotsParams.Num(); ++i)
-	{
-		if(FVector::Distance(BotsParams[i].Position, ClickPosition) < 50)
-		{
-			BotsParams[i].IsControlled = true;
-			LogBotsParameters(BotsParams[i]);
-		}
-		else
-		{
-			BotsParams[i].IsControlled = false;
-		}
-	}
 }
 
 FVector BotsSystem::GetRandQuarterCenter(ATriggerBox* MatchAreaBox, ETeam GoalToTeam)
@@ -619,50 +538,4 @@ TArray<FVector> BotsSystem::GetRowPointsFromCenter(FVector Center, ATriggerBox* 
 			}
 	}
 	return PointsArray;
-}
-
-void BotsSystem::testfunc(UWorld* World, ATriggerBox* MatchAreaBox)
-{
-	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
-
-	FVector BoxCenter = Box->GetComponentLocation();
-	FVector BoxExtent = Box->GetScaledBoxExtent();
-	FVector BoxForward = Box->GetForwardVector();
-	FVector BoxRight = Box->GetRightVector();
-	
-	FVector RadiusOffset = (BoxCenter - BoxForward * BoxExtent) * 0.16;
-	float Radius1 = FVector::Distance(BoxCenter, RadiusOffset);
-	
-	FVector Dir1 = (-BoxForward + BoxRight).GetSafeNormal();
-	FVector Dir2 = (-BoxForward - BoxRight).GetSafeNormal();
-	
-	FVector Point1 = BoxCenter + Dir1 * Radius1;
-	FVector Point2 = BoxCenter + Dir2 * Radius1;
-	
-	DrawDebugPoint(
-				World,
-				RadiusOffset,
-				10,
-				FColor::Red,
-				false,
-				60,
-				0);
-	
-	DrawDebugPoint(
-				World,
-				Point1,
-				10,
-				FColor::Blue,
-				false,
-				60,
-				0);
-	
-	DrawDebugPoint(
-				World,
-				Point2,
-				10,
-				FColor::Blue,
-				false,
-				60,
-				0);
 }

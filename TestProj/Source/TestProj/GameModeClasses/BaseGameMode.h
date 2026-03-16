@@ -18,6 +18,7 @@ class TESTPROJ_API ABaseGameMode : public ATestProjGameModeBase
 
 	ABaseGameMode();
 
+	APlayerController* PC;
 	
 
 public:

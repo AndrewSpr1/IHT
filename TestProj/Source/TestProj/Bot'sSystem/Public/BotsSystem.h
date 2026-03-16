@@ -8,7 +8,7 @@
 namespace BotsSystem
 {
 	//Call in GameMode
-	void Update(UWorld* World, TArray<FBotParam> BotsParams, FPuckParam PuckParams);
+	void Update(UWorld* World, ATriggerBox* MatchAreaBox, float DeltaTime, APlayerController* PC, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams);
 	void Init(
 		UWorld* World, 
 		APlayerController* PC, 
@@ -42,12 +42,8 @@ namespace BotsSystem
 	//Debud
 	void UpdateBotsDebug(UWorld* World, TArray<FBotParam> BotsParams);
 	void UpdatePuckDebug(UWorld* World, FPuckParam Puck);
-	void DrawDebug(UWorld* World, FVector Position, FColor Color, float Radius = 50.f, int32 Segments = 32, float Thickness = 2.f, float Duration = 0.1f);
-	void DrawDirectionDebug(UWorld* World, FBotParam BotsParams, FColor Color, float Radius = 50.f, float Thickness = 2.f, float Duration = 0.1f);
-
-	//MouseClick
-	void FindMouseClickPosition(UWorld* World, APlayerController* PC, ABaseGameMode* GameMode);
-	void CheckClickDistance(FVector ClickPosition, TArray<FBotParam>& BotsParams, FPuckParam& PuckParam);
+	void DrawDebug(UWorld* World, FVector Position, FColor Color, float Radius = 50.f, int32 Segments = 32, float Thickness = 2.f, float Duration = 0.01f);
+	void DrawDirectionDebug(UWorld* World, FBotParam BotsParams, FColor Color, float Radius = 50.f, float Thickness = 2.f, float Duration = 0.01f);
 
 	//Find positions on Goal
 	FVector GetRandQuarterCenter(ATriggerBox* MatchAreaBox, ETeam GoalToTeam);
@@ -57,14 +53,9 @@ namespace BotsSystem
 	//Find positions on FaceOff
 	TMap<ECharacterPosition, FVector> GetCenterPoints(ATriggerBox* MatchAreaBox, ETeam Team, EIHMatchGameMode MatchGameMode, float CenterPointOffset = 100);
 	
+	//Find positions on default
 	FVector GetBlueLineCenterPoint(ATriggerBox* MatchAreaBox, ETeam Team);
-	
 	TArray<FVector> GetRowPointsFromCenter(FVector Center, ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, float Radius);
-	
-	
-	void testfunc (UWorld* World, ATriggerBox* MatchAreaBox);
-
-	
 	
 
 }

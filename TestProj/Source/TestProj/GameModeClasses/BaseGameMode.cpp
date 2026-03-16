@@ -6,6 +6,7 @@
 #include "BasePlayerController.h"
 #include "BasePlayerState.h"
 #include "BaseSpectatorPawn.h"
+#include "TestProj/Bot'sSystem/Public/BotNavigationSystem.h"
 #include "TestProj/Bot'sSystem/Public/BotsSystem.h"
 
 ABaseGameMode::ABaseGameMode()
@@ -25,14 +26,15 @@ void ABaseGameMode::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	BotsSystem::Update(GetWorld(), GameModeParams.BotsParamArray, GameModeParams.PuckParam);
+	BotsSystem::Update(GetWorld(), GameModeParams.MatchAreaBox, DeltaTime, PC, GameModeParams.BotsParamArray, GameModeParams.PuckParam);
+	BotNavigationSystem::Update(DeltaTime, PC, GameModeParams.MatchAreaBox, GetWorld(), ETeam::Team1, GameModeParams.BotsParamArray, GameModeParams.PuckParam);
 }
 
 void ABaseGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	PC = GetWorld()->GetFirstPlayerController();
 	check(PC)
 
 	BotsSystem::Init(
@@ -46,5 +48,7 @@ void ABaseGameMode::BeginPlay()
 		GameModeParams.MatchGameMode,
 		GameModeParams.GoalToTeam
 		);
+	
+	BotNavigationSystem::Init(PC, GameModeParams.MatchAreaBox, GetWorld(), GameModeParams.BotsParamArray, GameModeParams.PuckParam);
 }
 
