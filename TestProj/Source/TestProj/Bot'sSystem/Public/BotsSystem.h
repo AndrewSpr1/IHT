@@ -18,7 +18,7 @@ namespace BotsSystem
 		AGlobalCamera*& GlobalCamera, 
 		ATriggerBox*& MatchAreaBox, 
 		EIHMatchGameMode MatchGameMode, 
-		bool bIsGoalTop = false
+		ETeam GoalToTeam
 		);
 
 	//Spawn and find functions
@@ -30,13 +30,14 @@ namespace BotsSystem
 	void LogBotsParameters(FBotParam BotParam);
 
 	//Set default parameters
-	void SetBotsParams(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray, float CenterRadius = 200);
+	void SetBotsParams(TArray<FBotParam>& BotsParamsArray);
 	void SetPuckParams(ATriggerBox* MatchAreaBox, FPuckParam& Puck);
 
 	//Set parameters after change rules
-	void SetRules(EIHMatchRulesMode Rules, ATriggerBox* MatchAreaBox, TArray<FBotParam>& BotsParamsArray, EIHMatchGameMode MatchGameMode, bool bIsGoalTop = false, float CenterRadius = 200);
-	void SetBotsFaceOffParams(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray, float CenterRadius);
-	void SetBotsGoalParams(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray, bool bIsGoalTop, float CenterRadius);
+	void SetRules(EIHMatchRulesMode Rules, ATriggerBox* MatchAreaBox, TArray<FBotParam>& BotsParamsArray, EIHMatchGameMode MatchGameMode, ETeam GoalToTeam);
+	void SetBotsFaceOffPositions(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray);
+	void SetBotsGoalPositions(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray, ETeam GoalToTeam);
+	void SetBotsDefaultPositions(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray);
 	
 	//Debud
 	void UpdateBotsDebug(UWorld* World, TArray<FBotParam> BotsParams);
@@ -49,12 +50,19 @@ namespace BotsSystem
 	void CheckClickDistance(FVector ClickPosition, TArray<FBotParam>& BotsParams, FPuckParam& PuckParam);
 
 	//Find positions on Goal
-	FVector GetRandQuarterCenter(ATriggerBox* MatchAreaBox, bool bTop = true);
+	FVector GetRandQuarterCenter(ATriggerBox* MatchAreaBox, ETeam GoalToTeam);
 	FVector FindPointOnCircle(FVector Center, float Angle, float Radius = 100);
 	TArray<FVector> GetPointsOnCircle(FVector Center, bool bIsRand = false, float DefaultAngle = 0, int PointsCount = 3, float Radius = 100);
 
 	//Find positions on FaceOff
-	TMap<ECharacterPosition, FVector> GetCenterPoints(ATriggerBox* MatchAreaBox, ETeam Team, EIHMatchGameMode MatchGameMode, float Radius, float CenterPointOffset = 100);
+	TMap<ECharacterPosition, FVector> GetCenterPoints(ATriggerBox* MatchAreaBox, ETeam Team, EIHMatchGameMode MatchGameMode, float CenterPointOffset = 100);
+	
+	FVector GetBlueLineCenterPoint(ATriggerBox* MatchAreaBox, ETeam Team);
+	
+	TArray<FVector> GetRowPointsFromCenter(FVector Center, ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, float Radius);
+	
+	
+	void testfunc (UWorld* World, ATriggerBox* MatchAreaBox);
 
 	
 	

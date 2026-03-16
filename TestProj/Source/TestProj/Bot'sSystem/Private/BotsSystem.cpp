@@ -13,10 +13,10 @@ DEFINE_LOG_CATEGORY_STATIC(BotSystem, Log, All)
 void BotsSystem::Update(UWorld* World, TArray<FBotParam> BotsParams, FPuckParam PuckParams)
 {
 	UpdateBotsDebug(World, BotsParams);
-	UpdatePuckDebug(World, PuckParams);
+	//UpdatePuckDebug(World, PuckParams);
 }
 
-void BotsSystem::Init(UWorld* World, APlayerController* PC, EIHMatchRulesMode Rules, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams, AGlobalCamera*& GlobalCamera, ATriggerBox*& MatchAreaBox, EIHMatchGameMode MatchGameMode, bool bIsGoalTop)
+void BotsSystem::Init(UWorld* World, APlayerController* PC, EIHMatchRulesMode Rules, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams, AGlobalCamera*& GlobalCamera, ATriggerBox*& MatchAreaBox, EIHMatchGameMode MatchGameMode, ETeam GoalToTeam)
 {
 	if(!World)
 	{
@@ -34,9 +34,12 @@ void BotsSystem::Init(UWorld* World, APlayerController* PC, EIHMatchRulesMode Ru
 		SetGlobalCameraView(PC, GlobalCamera);
 		if (MatchAreaBox && GlobalCamera)
 		{
-			SetBotsParams(MatchAreaBox, MatchGameMode, BotsParams, 170);
+			SetBotsParams(BotsParams);
+			SetBotsDefaultPositions(MatchAreaBox, MatchGameMode, BotsParams);
 			SetPuckParams(MatchAreaBox, PuckParams);
-			SetRules(Rules, MatchAreaBox, BotsParams, MatchGameMode, bIsGoalTop, 170);
+			SetRules(Rules, MatchAreaBox, BotsParams, MatchGameMode, GoalToTeam);
+			
+			//testfunc(World, MatchAreaBox);
 		}
 	}
 }
@@ -93,7 +96,7 @@ void BotsSystem::LogBotsParameters(FBotParam BotParam)
 	UE_LOG(BotSystem, Display, TEXT("Role: %s"), *UEnum::GetValueAsString(BotParam.Role));
 }
 
-void BotsSystem::SetBotsParams(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray, float CenterRadius)
+void BotsSystem::SetBotsParams(TArray<FBotParam>& BotsParamsArray)
 {
 	FBotParam BotParams;
 	
@@ -112,7 +115,6 @@ void BotsSystem::SetBotsParams(ATriggerBox* MatchAreaBox, EIHMatchGameMode Match
 		BotParams.Role = static_cast<ECharacterPosition>(i/2 + 1);
 		BotsParamsArray.Add(BotParams);
 	}
-	SetBotsFaceOffParams(MatchAreaBox, MatchGameMode, BotsParamsArray, CenterRadius);
 	
 	for(int i = 0; i < BotsParamsArray.Num(); ++i)
 	{
@@ -120,7 +122,7 @@ void BotsSystem::SetBotsParams(ATriggerBox* MatchAreaBox, EIHMatchGameMode Match
 	}
 }
 
-void BotsSystem::SetRules(EIHMatchRulesMode Rules, ATriggerBox* MatchAreaBox, TArray<FBotParam>& BotsParamsArray, EIHMatchGameMode MatchGameMode, bool bIsGoalTop, float CenterRadius)
+void BotsSystem::SetRules(EIHMatchRulesMode Rules, ATriggerBox* MatchAreaBox, TArray<FBotParam>& BotsParamsArray, EIHMatchGameMode MatchGameMode, ETeam GoalToTeam)
 {
 	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
 	UE_LOG(BotSystem, Display, TEXT("---SetRules---"));
@@ -128,15 +130,31 @@ void BotsSystem::SetRules(EIHMatchRulesMode Rules, ATriggerBox* MatchAreaBox, TA
 	
 	switch (Rules)
 	{
+	case EIHMatchRulesMode::None:
+		break;
 	case EIHMatchRulesMode::FaceOff:
 		{
-			SetBotsFaceOffParams(MatchAreaBox, MatchGameMode, BotsParamsArray, CenterRadius);
+			SetBotsFaceOffPositions(MatchAreaBox, MatchGameMode, BotsParamsArray);
 			break;
 		}
 	case  EIHMatchRulesMode::Goal:
 		{
-			UE_LOG(BotSystem, Display, TEXT("MatchRule: %s"), bIsGoalTop ? TEXT("First team scored a goal") : TEXT("Second team scored a goal"));
-			SetBotsGoalParams(MatchAreaBox, MatchGameMode, BotsParamsArray, bIsGoalTop, CenterRadius);
+			switch (GoalToTeam)
+			{
+				case ETeam::Team1:
+					UE_LOG(BotSystem, Display, TEXT("MatchRule: Second team scored a goal"));
+					SetBotsGoalPositions(MatchAreaBox, MatchGameMode, BotsParamsArray, GoalToTeam);
+					break;
+				case ETeam::Team2:
+					UE_LOG(BotSystem, Display, TEXT("MatchRule: First team scored a goal"));
+					SetBotsGoalPositions(MatchAreaBox, MatchGameMode, BotsParamsArray, GoalToTeam);
+					break;
+				case ETeam::TeamNone:
+					UE_LOG(BotSystem, Error, TEXT("MatchRule: The team was not transmitted. FaceOff mode is set"));
+					SetBotsFaceOffPositions(MatchAreaBox, MatchGameMode, BotsParamsArray);
+					break;
+			}
+			
 			break;
 		}
 	}
@@ -147,25 +165,26 @@ void BotsSystem::SetRules(EIHMatchRulesMode Rules, ATriggerBox* MatchAreaBox, TA
 	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
 }
 
-void BotsSystem::SetBotsFaceOffParams(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray, float CenterRadius)
+void BotsSystem::SetBotsFaceOffPositions(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray)
 {
 	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
 	UE_LOG(BotSystem, Display, TEXT("---SetBotsFaceOffParams---"));
-	TMap<ECharacterPosition, FVector> FirstTeamParams = GetCenterPoints(MatchAreaBox, ETeam::Team1, MatchGameMode, CenterRadius);
-	TMap<ECharacterPosition, FVector> SecondTeamParams = GetCenterPoints(MatchAreaBox, ETeam::Team2, MatchGameMode, CenterRadius);
+	TMap<ECharacterPosition, FVector> FirstTeamParams = GetCenterPoints(MatchAreaBox, ETeam::Team1, MatchGameMode);
+	TMap<ECharacterPosition, FVector> SecondTeamParams = GetCenterPoints(MatchAreaBox, ETeam::Team2, MatchGameMode);
+	FVector AreaCenter = MatchAreaBox->GetActorLocation();
 	
 	for (int i = 0; i < BotsParamsArray.Num(); ++i)
 	{
 		if(BotsParamsArray[i].Team == ETeam::Team1)
 		{
 			BotsParamsArray[i].Position = FirstTeamParams[BotsParamsArray[i].Role];
-			FVector Direction = (FVector::ZeroVector - BotsParamsArray[i].Position).GetSafeNormal();
+			FVector Direction = (AreaCenter - BotsParamsArray[i].Position).GetSafeNormal();
 			BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
 		}
 		else
 		{
 			BotsParamsArray[i].Position = SecondTeamParams[BotsParamsArray[i].Role];
-			FVector Direction = (FVector::ZeroVector - BotsParamsArray[i].Position).GetSafeNormal();
+			FVector Direction = (AreaCenter - BotsParamsArray[i].Position).GetSafeNormal();
 			BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
 		}
 	}
@@ -173,55 +192,96 @@ void BotsSystem::SetBotsFaceOffParams(ATriggerBox* MatchAreaBox, EIHMatchGameMod
 	
 }
 
-void BotsSystem::SetBotsGoalParams(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray, bool bIsGoalTop, float CenterRadius)
+void BotsSystem::SetBotsGoalPositions(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray, ETeam GoalToTeam)
 {
 	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
 	UE_LOG(BotSystem, Display, TEXT("---SetBotsGoalParams---"));
+	FVector AreaCenter = MatchAreaBox->GetActorLocation();
 	switch (MatchGameMode)
 	{
 	case EIHMatchGameMode::MatchGameMode_3x3:
 		{
-			FVector QuarterPoint = GetRandQuarterCenter(MatchAreaBox, bIsGoalTop);
+			FVector QuarterPoint = GetRandQuarterCenter(MatchAreaBox, GoalToTeam);
 			TArray<FVector> PointsNearQuarterPoint = GetPointsOnCircle(QuarterPoint, true);
-			if(bIsGoalTop)
+			switch (GoalToTeam)
 			{
-				TMap<ECharacterPosition, FVector> SecondTeamParams = GetCenterPoints(MatchAreaBox, ETeam::Team2, MatchGameMode, CenterRadius);
-				for (int i = 0; i < BotsParamsArray.Num(); ++i)
-				{
-					if(BotsParamsArray[i].Team == ETeam::Team1)
+				case ETeam::Team1:
 					{
-						BotsParamsArray[i].Position = PointsNearQuarterPoint[i/2];
-						FVector Direction = (QuarterPoint - BotsParamsArray[i].Position).GetSafeNormal();
-						BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
+						TMap<ECharacterPosition, FVector> FirstTeamParams = GetCenterPoints(MatchAreaBox, ETeam::Team1, MatchGameMode);
+						for (int i = 0; i < BotsParamsArray.Num(); ++i)
+						{
+							if(BotsParamsArray[i].Team == ETeam::Team2)
+							{
+								BotsParamsArray[i].Position = PointsNearQuarterPoint[i/2];
+								FVector Direction = (QuarterPoint - BotsParamsArray[i].Position).GetSafeNormal();
+								BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
+							}
+							else
+							{
+								BotsParamsArray[i].Position = FirstTeamParams[BotsParamsArray[i].Role];
+								FVector Direction = (AreaCenter - BotsParamsArray[i].Position).GetSafeNormal();
+								BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
+							}
+						}
+						break;
 					}
-					else
-					{
-						BotsParamsArray[i].Position = SecondTeamParams[BotsParamsArray[i].Role];
-						FVector Direction = (FVector::ZeroVector - BotsParamsArray[i].Position).GetSafeNormal();
-						BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
-					}
-				}
-			}
-			else
-			{
-				TMap<ECharacterPosition, FVector> FirstTeamParams = GetCenterPoints(MatchAreaBox, ETeam::Team1, MatchGameMode, CenterRadius);
-				for (int i = 0; i < BotsParamsArray.Num(); ++i)
-				{
-					if(BotsParamsArray[i].Team == ETeam::Team2)
-					{
-						BotsParamsArray[i].Position = PointsNearQuarterPoint[i/2];
-						FVector Direction = (QuarterPoint - BotsParamsArray[i].Position).GetSafeNormal();
-						BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
-					}
-					else
-					{
-						BotsParamsArray[i].Position = FirstTeamParams[BotsParamsArray[i].Role];
-						FVector Direction = (FVector::ZeroVector - BotsParamsArray[i].Position).GetSafeNormal();
-						BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
-					}
-				}
+				case ETeam::Team2:
+						{
+							TMap<ECharacterPosition, FVector> SecondTeamParams = GetCenterPoints(MatchAreaBox, ETeam::Team2, MatchGameMode);
+							for (int i = 0; i < BotsParamsArray.Num(); ++i)
+							{
+								if(BotsParamsArray[i].Team == ETeam::Team1)
+								{
+									BotsParamsArray[i].Position = PointsNearQuarterPoint[i/2];
+									FVector Direction = (QuarterPoint - BotsParamsArray[i].Position).GetSafeNormal();
+									BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
+								}
+								else
+								{
+									BotsParamsArray[i].Position = SecondTeamParams[BotsParamsArray[i].Role];
+									FVector Direction = (AreaCenter - BotsParamsArray[i].Position).GetSafeNormal();
+									BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
+								}
+							}
+							break;
+						}
 			}
 			break;
+		}
+	}
+}
+
+void BotsSystem::SetBotsDefaultPositions(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray)
+{
+	FVector BlueLineCenterTeam1 = GetBlueLineCenterPoint(MatchAreaBox, ETeam::Team1);
+	FVector BlueLineCenterTeam2 = GetBlueLineCenterPoint(MatchAreaBox, ETeam::Team2);
+	
+	TArray<FVector> PointsOnBlueLineTeam1 = GetRowPointsFromCenter(BlueLineCenterTeam1, MatchAreaBox, MatchGameMode, 50);
+	TArray<FVector> PointsOnBlueLineTeam2 = GetRowPointsFromCenter(BlueLineCenterTeam2, MatchAreaBox, MatchGameMode, 50);
+	
+	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
+
+	FVector BoxCenter = Box->GetComponentLocation();
+	FVector BoxExtent = Box->GetScaledBoxExtent();
+	FVector BoxRightVector = Box->GetRightVector();
+	FVector LookPoint = BoxCenter + BoxRightVector * BoxExtent;
+	
+	FVector Direction;
+	
+	for (int i = 0; i < BotsParamsArray.Num(); ++i)
+	{
+		switch (BotsParamsArray[i].Team)
+		{
+			case ETeam::Team1:
+				BotsParamsArray[i].Position = PointsOnBlueLineTeam1[i/2];
+				Direction = (LookPoint - PointsOnBlueLineTeam1[i/2]).GetSafeNormal();
+				BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
+				break;
+			case ETeam::Team2:
+				BotsParamsArray[i].Position = PointsOnBlueLineTeam2[i/2];
+				Direction = (LookPoint - PointsOnBlueLineTeam2[i/2]).GetSafeNormal();
+				BotsParamsArray[i].Direction = Direction.ToOrientationQuat();
+				break;
 		}
 	}
 }
@@ -388,7 +448,7 @@ void BotsSystem::CheckClickDistance(FVector ClickPosition, TArray<FBotParam>& Bo
 	}
 }
 
-FVector BotsSystem::GetRandQuarterCenter(ATriggerBox* MatchAreaBox, bool bTop)
+FVector BotsSystem::GetRandQuarterCenter(ATriggerBox* MatchAreaBox, ETeam GoalToTeam)
 {
 	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
 
@@ -406,8 +466,19 @@ FVector BotsSystem::GetRandQuarterCenter(ATriggerBox* MatchAreaBox, bool bTop)
 	FVector LeftSide = Center - Right * Extent.Y;
 
 	bool bRight = FMath::RandBool();
+	FVector FrontOrBack;
 
-	FVector FrontOrBack = bTop ? Front : Back;
+	switch (GoalToTeam)
+	{
+	case ETeam::Team1:
+		FrontOrBack = Back;
+		break;
+	case ETeam::Team2:
+		FrontOrBack = Front;
+		break;
+	}
+
+	//FVector FrontOrBack = bTop ? Front : Back;
 	FVector RightOrLeft = bRight ? RightSide : LeftSide;
 
 	FVector CenterQuarter = (FrontOrBack + RightOrLeft) * 0.5f;
@@ -454,11 +525,17 @@ FVector BotsSystem::FindPointOnCircle(FVector Center, float Angle, float Radius)
 	return FVector(X, Y, Center.Z);
 }
 
-TMap<ECharacterPosition, FVector> BotsSystem::GetCenterPoints(ATriggerBox* MatchAreaBox, ETeam Team, EIHMatchGameMode MatchGameMode, float Radius, float CenterPointOffset)
+TMap<ECharacterPosition, FVector> BotsSystem::GetCenterPoints(ATriggerBox* MatchAreaBox, ETeam Team, EIHMatchGameMode MatchGameMode, float CenterPointOffset)
 {
-	const FVector Center = MatchAreaBox->GetActorLocation();
-	const FVector Forward = MatchAreaBox->GetActorForwardVector();
-	const FVector Right = MatchAreaBox->GetActorRightVector();
+	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
+
+	FVector BoxCenter = Box->GetComponentLocation();
+	FVector BoxExtent = Box->GetScaledBoxExtent();
+	FVector BoxForward = Box->GetForwardVector();
+	FVector BoxRight = Box->GetRightVector();
+	
+	FVector RadiusOffset = (BoxCenter - BoxForward * BoxExtent) * 0.16; //0.16 - на эту часть делится половина поля, для нахождения точки, лежащей на окружности центральной зоны
+	float Radius = FVector::Distance(FVector::ZeroVector, RadiusOffset);
 	
 	TMap<ECharacterPosition, FVector> PointsArray;
 
@@ -472,20 +549,20 @@ TMap<ECharacterPosition, FVector> BotsSystem::GetCenterPoints(ATriggerBox* Match
 			switch (Team)
 			{
 			case ETeam::Team1:
-				Dir1 = -Forward + Right; //Низ-право
-				Dir2 = -Forward - Right; //Низ-лево
+				Dir1 = (-BoxForward + BoxRight).GetSafeNormal(); //Низ-право
+				Dir2 = (-BoxForward - BoxRight).GetSafeNormal(); //Низ-лево
 
-				PointsArray.Add(ECharacterPosition::RightWing, Center + Dir1 * Radius);
-				PointsArray.Add(ECharacterPosition::LeftWing, Center + Dir2 * Radius);
-				PointsArray.Add(ECharacterPosition::Center, Center - Forward * CenterPointOffset);
+				PointsArray.Add(ECharacterPosition::RightWing, BoxCenter + Dir1 * Radius);
+				PointsArray.Add(ECharacterPosition::LeftWing, BoxCenter + Dir2 * Radius);
+				PointsArray.Add(ECharacterPosition::Center, BoxCenter - BoxForward * CenterPointOffset);
 				break;
 			case ETeam::Team2:
-				Dir1 = Forward + Right; //Верх-право
-				Dir2 = Forward - Right; //Верх-лево
+				Dir1 = (BoxForward + BoxRight).GetSafeNormal(); //Верх-право
+				Dir2 = (BoxForward - BoxRight).GetSafeNormal(); //Верх-лево
 
-				PointsArray.Add(ECharacterPosition::LeftWing, Center + Dir1 * Radius);
-				PointsArray.Add(ECharacterPosition::RightWing, Center + Dir2 * Radius);
-				PointsArray.Add(ECharacterPosition::Center, Center + Forward * CenterPointOffset);
+				PointsArray.Add(ECharacterPosition::LeftWing, BoxCenter + Dir1 * Radius);
+				PointsArray.Add(ECharacterPosition::RightWing, BoxCenter + Dir2 * Radius);
+				PointsArray.Add(ECharacterPosition::Center, BoxCenter + BoxForward * CenterPointOffset);
 				break;
 			}
 			break;
@@ -501,4 +578,91 @@ TMap<ECharacterPosition, FVector> BotsSystem::GetCenterPoints(ATriggerBox* Match
 	}  
 	
 	return PointsArray;
+}
+
+FVector BotsSystem::GetBlueLineCenterPoint(ATriggerBox* MatchAreaBox, ETeam Team)
+{
+	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
+
+	FVector BoxCenter = Box->GetComponentLocation();
+	FVector BoxExtent = Box->GetScaledBoxExtent();
+	FVector BoxForward = Box->GetForwardVector();
+	
+	FVector BlueLineCenter;
+	
+	// Рассматриваем половину арены, при делении на 0.5, получаем 1/4, при делении на 0.25, получаем 1/8, но для нахождения линии, необходимо делить на 0.3, т.е. 1/3 половины поля
+	switch (Team)
+	{
+		case ETeam::Team1:
+			BlueLineCenter = (BoxCenter - BoxForward * BoxExtent) * 0.3;
+			break;
+		case ETeam::Team2:
+			BlueLineCenter = (BoxCenter + BoxForward * BoxExtent) * 0.3;
+			break;
+	}
+	
+	return BlueLineCenter;
+}
+
+TArray<FVector> BotsSystem::GetRowPointsFromCenter(FVector Center, ATriggerBox* MatchAreaBox,
+	EIHMatchGameMode MatchGameMode, float Radius)
+{
+	TArray<FVector> PointsArray;
+	FVector RightVector = MatchAreaBox->GetActorRightVector();
+	switch (MatchGameMode)
+	{
+		case EIHMatchGameMode::MatchGameMode_3x3:
+			{
+				PointsArray.Add(Center);
+				PointsArray.Add(Center + RightVector * (Radius * 2));
+				PointsArray.Add(Center - RightVector * (Radius * 2));
+			}
+	}
+	return PointsArray;
+}
+
+void BotsSystem::testfunc(UWorld* World, ATriggerBox* MatchAreaBox)
+{
+	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
+
+	FVector BoxCenter = Box->GetComponentLocation();
+	FVector BoxExtent = Box->GetScaledBoxExtent();
+	FVector BoxForward = Box->GetForwardVector();
+	FVector BoxRight = Box->GetRightVector();
+	
+	FVector RadiusOffset = (BoxCenter - BoxForward * BoxExtent) * 0.16;
+	float Radius1 = FVector::Distance(BoxCenter, RadiusOffset);
+	
+	FVector Dir1 = (-BoxForward + BoxRight).GetSafeNormal();
+	FVector Dir2 = (-BoxForward - BoxRight).GetSafeNormal();
+	
+	FVector Point1 = BoxCenter + Dir1 * Radius1;
+	FVector Point2 = BoxCenter + Dir2 * Radius1;
+	
+	DrawDebugPoint(
+				World,
+				RadiusOffset,
+				10,
+				FColor::Red,
+				false,
+				60,
+				0);
+	
+	DrawDebugPoint(
+				World,
+				Point1,
+				10,
+				FColor::Blue,
+				false,
+				60,
+				0);
+	
+	DrawDebugPoint(
+				World,
+				Point2,
+				10,
+				FColor::Blue,
+				false,
+				60,
+				0);
 }

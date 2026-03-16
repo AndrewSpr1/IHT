@@ -44,7 +44,7 @@ void ABaseGameMode::BeginPlay()
 		GameModeParams.GlobalCamera,
 		GameModeParams.MatchAreaBox,
 		GameModeParams.MatchGameMode,
-		GameModeParams.bIsGoalTop
+		GameModeParams.GoalToTeam
 		);
 }
 

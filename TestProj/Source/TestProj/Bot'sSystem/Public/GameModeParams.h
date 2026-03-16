@@ -27,7 +27,7 @@ struct FGameModeParams
 	EIHMatchGameMode MatchGameMode = EIHMatchGameMode::MatchGameMode_3x3;
 	
 	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
-	bool bIsGoalTop = false;
+	ETeam GoalToTeam = ETeam::Team1;
 
 	UPROPERTY()
 	AGlobalCamera* GlobalCamera = nullptr;
