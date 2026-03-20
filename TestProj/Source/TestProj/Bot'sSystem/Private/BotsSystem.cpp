@@ -10,19 +10,22 @@
 
 DEFINE_LOG_CATEGORY_STATIC(BotSystem, Log, All)
 
-void BotsSystem::Update(UWorld* World, ATriggerBox* MatchAreaBox, float DeltaTime, APlayerController* PC, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams)
+void BotsSystem::Update(UWorld* World, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams)
 {
 	UpdateBotsDebug(World, BotsParams);
 	UpdatePuckDebug(World, PuckParams);
-	
-	/*if (PuckParams.IsControlled)
-	{
-		UpdatePuckPosition(DeltaTime, MatchAreaBox, World, PC, PuckParams);
-	}
-	UpdateBotsPosition(DeltaTime, MatchAreaBox, World, BotsParams, PuckParams);*/
 }
 
-void BotsSystem::Init(UWorld* World, APlayerController* PC, EIHMatchRulesMode Rules, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams, AGlobalCamera*& GlobalCamera, ATriggerBox*& MatchAreaBox, EIHMatchGameMode MatchGameMode, ETeam GoalToTeam)
+void BotsSystem::Init(UWorld* World,
+					APlayerController* PC,
+					EIHMatchRulesMode Rules,
+					TArray<FBotParam>& BotsParams,
+					FPuckParam& PuckParams,
+					AGlobalCamera*& GlobalCamera,
+					ATriggerBox*& MatchAreaBox,
+					EIHMatchGameMode MatchGameMode,
+					ETeam GoalToTeam,
+					TArray<FGoalParams>& GoalsParams)
 {
 	if(!World)
 	{
@@ -35,6 +38,7 @@ void BotsSystem::Init(UWorld* World, APlayerController* PC, EIHMatchRulesMode Ru
 	CameraSpawn(World, GlobalCamera);
 	FindBoxActor(World, MatchAreaBox);
 	UE_LOG(BotSystem, Display, TEXT("MatchMode: %s"), *UEnum::GetValueAsString(MatchGameMode));
+	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
 	if (GlobalCamera)
 	{
 		SetGlobalCameraView(PC, GlobalCamera);
@@ -44,7 +48,7 @@ void BotsSystem::Init(UWorld* World, APlayerController* PC, EIHMatchRulesMode Ru
 			SetBotsDefaultPositions(MatchAreaBox, MatchGameMode, BotsParams);
 			SetPuckParams(MatchAreaBox, PuckParams);
 			SetRules(Rules, MatchAreaBox, BotsParams, MatchGameMode, GoalToTeam);
-			
+			SetGoalsParams(Box, GoalsParams);
 		}
 	}
 }
@@ -73,7 +77,7 @@ void BotsSystem::CameraSpawn(UWorld* World, AGlobalCamera*& GlobalCamera)
 {
 	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
 	UE_LOG(BotSystem, Display, TEXT("---CameraSpawn---"));
-	GlobalCamera = World->SpawnActor<AGlobalCamera>(AGlobalCamera::StaticClass(), FVector(0,0,2800), FRotator(-90,0,0));
+	GlobalCamera = World->SpawnActor<AGlobalCamera>(AGlobalCamera::StaticClass(), FVector(0,0,3400), FRotator(-90,0,0));
 	if(GlobalCamera)
 	{
 		GlobalCamera->GetCameraComponent()->SetConstraintAspectRatio(false);
@@ -294,7 +298,28 @@ void BotsSystem::SetBotsDefaultPositions(ATriggerBox* MatchAreaBox, EIHMatchGame
 void BotsSystem::SetPuckParams(ATriggerBox* MatchAreaBox, FPuckParam& Puck)
 {
 	FTransform CenterTransform = MatchAreaBox->GetActorTransform();
-	Puck.Position = CenterTransform.TransformPosition(FVector(0,0,0));
+	Puck.Position = CenterTransform.TransformPosition(FVector(0,1,0));
+}
+
+void BotsSystem::SetGoalsParams(UBoxComponent* Box, TArray<FGoalParams>& GoalsParams)
+{
+	FGoalParams GoalParams;
+	
+	FVector ForwardBoxVector = Box->GetForwardVector();
+	FVector BoxCenter = Box->GetComponentLocation();
+	FVector BoxExtent = Box->GetScaledBoxExtent();
+	FVector PositionTeam1 = BoxCenter - ForwardBoxVector * BoxExtent.X / 1.45f;
+	
+	GoalParams.Position = PositionTeam1;
+	GoalParams.GoalTeam = ETeam::Team1;
+	GoalsParams.Add(GoalParams);
+	
+	FVector PositionTeam2 = BoxCenter + ForwardBoxVector * BoxExtent.X / 1.45f;
+	
+	GoalParams.Position = PositionTeam2;
+	GoalParams.GoalTeam = ETeam::Team2;
+	GoalsParams.Add(GoalParams);
+	
 }
 
 void BotsSystem::UpdateBotsDebug(UWorld* World, TArray<FBotParam> BotsParams)
@@ -447,14 +472,15 @@ FVector BotsSystem::FindPointOnCircle(FVector Center, float Angle, float Radius)
 TMap<ECharacterPosition, FVector> BotsSystem::GetCenterPoints(ATriggerBox* MatchAreaBox, ETeam Team, EIHMatchGameMode MatchGameMode, float CenterPointOffset)
 {
 	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
-
+	
 	FVector BoxCenter = Box->GetComponentLocation();
 	FVector BoxExtent = Box->GetScaledBoxExtent();
 	FVector BoxForward = Box->GetForwardVector();
 	FVector BoxRight = Box->GetRightVector();
 	
-	FVector RadiusOffset = (BoxCenter - BoxForward * BoxExtent) * 0.16; //0.16 - на эту часть делится половина поля, для нахождения точки, лежащей на окружности центральной зоны
-	float Radius = FVector::Distance(FVector::ZeroVector, RadiusOffset);
+	FVector RadiusOffset = BoxCenter + BoxForward * BoxExtent.X * 0.18; //0.18 - на эту часть делится половина поля, для нахождения точки, лежащей на окружности центральной зоны
+	float Radius = FVector::Distance(BoxCenter, RadiusOffset);
+	UE_LOG(LogTemp, Error, TEXT("%s"), *BoxCenter.ToString());
 	
 	TMap<ECharacterPosition, FVector> PointsArray;
 

@@ -1,4 +1,6 @@
-﻿UENUM(BlueprintType)
+﻿#pragma once
+
+UENUM(BlueprintType)
 enum class  ETeam : uint8 
 {
 	TeamNone = 0,

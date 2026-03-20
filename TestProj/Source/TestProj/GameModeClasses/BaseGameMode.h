@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Components/BoxComponent.h"
 #include "TestProj/TestProjGameModeBase.h"
 #include "TestProj/Bot'sSystem/Public/GameModeParams.h"
 #include "BaseGameMode.generated.h"
@@ -18,7 +19,10 @@ class TESTPROJ_API ABaseGameMode : public ATestProjGameModeBase
 
 	ABaseGameMode();
 
+	UPROPERTY()
 	APlayerController* PC;
+	UPROPERTY()
+	UBoxComponent* Box;
 	
 
 public:

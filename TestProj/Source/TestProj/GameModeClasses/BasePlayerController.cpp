@@ -21,7 +21,7 @@ void ABasePlayerController::BeginPlay()
 
 void ABasePlayerController::MousePressed()
 {
-	FVector ClickPosition = BotNavigationSystem::FindMouseClickPosition(GetWorld(), this);
+	FVector ClickPosition = BotNavigationSystem::FindMouseClickPosition(this);
 	BotNavigationSystem::CheckClickDistance(ClickPosition, BaseGameMode->GameModeParams.BotsParamArray, BaseGameMode->GameModeParams.PuckParam);
 }
 

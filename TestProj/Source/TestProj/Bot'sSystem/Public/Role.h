@@ -1,4 +1,6 @@
-﻿UENUM(BlueprintType)
+﻿#pragma once
+
+UENUM(BlueprintType)
 enum class ECharacterPosition : uint8
 {
 	Any          = 0,

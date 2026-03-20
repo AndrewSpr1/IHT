@@ -1,9 +1,11 @@
 ﻿#pragma once
 #include "BotParam.h"
 #include "GlobalCamera.h"
+#include "GoalParams.h"
 #include "MatchGameMode.h"
 #include "PuckParam.h"
 #include "Rules.h"
+#include "Zone.h"
 #include "Engine/TriggerBox.h"
 
 
@@ -28,6 +30,12 @@ struct FGameModeParams
 	
 	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
 	ETeam GoalToTeam = ETeam::Team1;
+	
+	UPROPERTY()
+	TArray<FZone> Zones;
+	
+	UPROPERTY()
+	TArray<FGoalParams> GoalParams;
 
 	UPROPERTY()
 	AGlobalCamera* GlobalCamera = nullptr;

@@ -8,7 +8,7 @@
 namespace BotsSystem
 {
 	//Call in GameMode
-	void Update(UWorld* World, ATriggerBox* MatchAreaBox, float DeltaTime, APlayerController* PC, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams);
+	void Update(UWorld* World, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams);
 	void Init(
 		UWorld* World, 
 		APlayerController* PC, 
@@ -18,7 +18,8 @@ namespace BotsSystem
 		AGlobalCamera*& GlobalCamera, 
 		ATriggerBox*& MatchAreaBox, 
 		EIHMatchGameMode MatchGameMode, 
-		ETeam GoalToTeam
+		ETeam GoalToTeam,
+		TArray<FGoalParams>& GoalsParams
 		);
 
 	//Spawn and find functions
@@ -32,6 +33,7 @@ namespace BotsSystem
 	//Set default parameters
 	void SetBotsParams(TArray<FBotParam>& BotsParamsArray);
 	void SetPuckParams(ATriggerBox* MatchAreaBox, FPuckParam& Puck);
+	void SetGoalsParams(UBoxComponent* Box, TArray<FGoalParams>& GoalsParams);
 
 	//Set parameters after change rules
 	void SetRules(EIHMatchRulesMode Rules, ATriggerBox* MatchAreaBox, TArray<FBotParam>& BotsParamsArray, EIHMatchGameMode MatchGameMode, ETeam GoalToTeam);
