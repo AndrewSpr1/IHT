@@ -27,12 +27,16 @@ struct FBotParam
 	UPROPERTY(Category=BotParameters, EditAnywhere, BlueprintReadWrite);
 	ECharacterPosition Role = ECharacterPosition::Any;
 	
-	bool operator== (const FBotParam& BotParam)
+	UPROPERTY()
+	FVector ViewDirection = FVector::ZeroVector;
+	
+	
+	bool operator== (const FBotParam& BotParam) const
 	{
 		return Position == BotParam.Position && Direction == BotParam.Direction && Team == BotParam.Team && Role == BotParam.Role;
 	}
 	
-	bool operator!= (const FBotParam& BotParam)
+	bool operator!= (const FBotParam& BotParam) const
 	{
 		return Position != BotParam.Position || Direction != BotParam.Direction || Team != BotParam.Team || Role != BotParam.Role;
 	}

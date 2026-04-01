@@ -6,6 +6,7 @@
 #include "PuckParam.h"
 #include "Rules.h"
 #include "Zone.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/TriggerBox.h"
 
 
@@ -18,6 +19,12 @@ struct FGameModeParams
 	
 	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
 	TArray<FBotParam> BotsParamArray;
+	
+	UPROPERTY()
+	TMap<AStaticMeshActor*, ETeam> BotsMap;
+	
+	UPROPERTY(Category=ActorBots, EditAnywhere, BlueprintReadWrite)
+	bool bUseActorBots = true;
 
 	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
 	FPuckParam PuckParam;
@@ -30,6 +37,21 @@ struct FGameModeParams
 	
 	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
 	ETeam GoalToTeam = ETeam::Team1;
+	
+	UPROPERTY(Category=Offsets, EditAnywhere, BlueprintReadWrite)
+	float Radius = 600;
+	
+	UPROPERTY(Category=Offsets, EditAnywhere, BlueprintReadWrite)
+	float AngleBetweenBots = 30;
+	
+	UPROPERTY(Category=Offsets, EditAnywhere, BlueprintReadWrite)
+	float OffsetUnderPuck = 500;
+	
+	UPROPERTY(Category=Offsets, EditAnywhere, BlueprintReadWrite)
+	float RightBotAngle = 0;
+	
+	UPROPERTY(Category=Offsets, EditAnywhere, BlueprintReadWrite)
+	float LeftBotAngle = 0;
 	
 	UPROPERTY()
 	TArray<FZone> Zones;

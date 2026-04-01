@@ -2,38 +2,46 @@
 #include "BotParam.h"
 #include "PuckParam.h"
 #include "Rules.h"
+#include "Engine/StaticMeshActor.h"
 #include "TestProj/GameModeClasses/BaseGameMode.h"
 
 
 namespace BotsSystem
 {
 	//Call in GameMode
-	void Update(UWorld* World, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams);
+	void Update(UWorld* World, float DeltaTime, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams);
 	void Init(
 		UWorld* World, 
 		APlayerController* PC, 
 		EIHMatchRulesMode Rules, 
-		TArray<FBotParam>& BotsParams, 
+		TArray<FBotParam>& BotsParams,
+		bool bUseActorBots,
+		TMap<AStaticMeshActor*, ETeam>& BotsMap,
 		FPuckParam& PuckParams, 
 		AGlobalCamera*& GlobalCamera, 
 		ATriggerBox*& MatchAreaBox, 
 		EIHMatchGameMode MatchGameMode, 
 		ETeam GoalToTeam,
-		TArray<FGoalParams>& GoalsParams
+		TArray<FGoalParams>& GoalsParams,
+		TArray<FZone>& Zones
 		);
 
 	//Spawn and find functions
 	void FindBoxActor(UWorld* World, ATriggerBox*& MatchAreaBox);
 	void CameraSpawn(UWorld* World, AGlobalCamera*& GlobalCamera);
 	void SetGlobalCameraView(APlayerController* PC, AGlobalCamera* GlobalCamera);
+	
+	void BotsSpawn(UWorld* World, TArray<FBotParam> BotsParams, TMap<AStaticMeshActor*, ETeam>& BotsMap);
 
 	//Log bot parameters
 	void LogBotsParameters(FBotParam BotParam);
+	void LogZonesParameters(FZone ZoneParams);
 
 	//Set default parameters
-	void SetBotsParams(TArray<FBotParam>& BotsParamsArray);
+	void SetBotsParams(TArray<FBotParam>& BotsParamsArray, FVector BoxForward);
 	void SetPuckParams(ATriggerBox* MatchAreaBox, FPuckParam& Puck);
 	void SetGoalsParams(UBoxComponent* Box, TArray<FGoalParams>& GoalsParams);
+	void SetZones(TArray<FZone>& Zones, UBoxComponent* Box);
 
 	//Set parameters after change rules
 	void SetRules(EIHMatchRulesMode Rules, ATriggerBox* MatchAreaBox, TArray<FBotParam>& BotsParamsArray, EIHMatchGameMode MatchGameMode, ETeam GoalToTeam);

@@ -1,31 +1,37 @@
 ﻿#include "TestProj/Bot'sSystem/Public/BotsSystem.h"
 
+
 #include "DrawDebugHelpers.h"
 #include "Camera/CameraActor.h"
 #include "EngineUtils.h"
 #include "Camera/CameraComponent.h"
 #include "Components/BoxComponent.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/TriggerBox.h"
 #include "TestProj/Bot'sSystem/Public/GlobalCamera.h"
 
 DEFINE_LOG_CATEGORY_STATIC(BotSystem, Log, All)
 
-void BotsSystem::Update(UWorld* World, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams)
+void BotsSystem::Update(UWorld* World, float DeltaTime, TArray<FBotParam>& BotsParams, FPuckParam& PuckParams)
 {
 	UpdateBotsDebug(World, BotsParams);
 	UpdatePuckDebug(World, PuckParams);
+	
 }
 
 void BotsSystem::Init(UWorld* World,
 					APlayerController* PC,
 					EIHMatchRulesMode Rules,
 					TArray<FBotParam>& BotsParams,
+					bool bUseActorBots,
+					TMap<AStaticMeshActor*, ETeam>& BotsMap,
 					FPuckParam& PuckParams,
 					AGlobalCamera*& GlobalCamera,
 					ATriggerBox*& MatchAreaBox,
 					EIHMatchGameMode MatchGameMode,
 					ETeam GoalToTeam,
-					TArray<FGoalParams>& GoalsParams)
+					TArray<FGoalParams>& GoalsParams,
+					TArray<FZone>& Zones)
 {
 	if(!World)
 	{
@@ -38,17 +44,28 @@ void BotsSystem::Init(UWorld* World,
 	CameraSpawn(World, GlobalCamera);
 	FindBoxActor(World, MatchAreaBox);
 	UE_LOG(BotSystem, Display, TEXT("MatchMode: %s"), *UEnum::GetValueAsString(MatchGameMode));
+	
 	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
+	
+	FVector BoxForward = Box->GetForwardVector();
+	
 	if (GlobalCamera)
 	{
 		SetGlobalCameraView(PC, GlobalCamera);
 		if (MatchAreaBox && GlobalCamera)
 		{
-			SetBotsParams(BotsParams);
+			SetZones(Zones, Box);
+			SetBotsParams(BotsParams, BoxForward);
 			SetBotsDefaultPositions(MatchAreaBox, MatchGameMode, BotsParams);
 			SetPuckParams(MatchAreaBox, PuckParams);
 			SetRules(Rules, MatchAreaBox, BotsParams, MatchGameMode, GoalToTeam);
 			SetGoalsParams(Box, GoalsParams);
+
+			if (bUseActorBots)
+			{
+				BotsSpawn(World, BotsParams, BotsMap);
+			}
+			
 		}
 	}
 }
@@ -77,7 +94,7 @@ void BotsSystem::CameraSpawn(UWorld* World, AGlobalCamera*& GlobalCamera)
 {
 	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
 	UE_LOG(BotSystem, Display, TEXT("---CameraSpawn---"));
-	GlobalCamera = World->SpawnActor<AGlobalCamera>(AGlobalCamera::StaticClass(), FVector(0,0,3400), FRotator(-90,0,0));
+	GlobalCamera = World->SpawnActor<AGlobalCamera>(AGlobalCamera::StaticClass(), FVector(0,0,3900), FRotator(-90,0,0));
 	if(GlobalCamera)
 	{
 		GlobalCamera->GetCameraComponent()->SetConstraintAspectRatio(false);
@@ -94,18 +111,48 @@ void BotsSystem::SetGlobalCameraView(APlayerController* PC, AGlobalCamera* Globa
 	PC->SetViewTarget(GlobalCamera);
 }
 
+void BotsSystem::BotsSpawn(UWorld* World, TArray<FBotParam> BotsParams, TMap<AStaticMeshActor*, ETeam>& BotsMap)
+{
+	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
+	UE_LOG(BotSystem, Display, TEXT("---BotsSpawn---"));
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("StaticMesh'/Engine/BasicShapes/Sphere.Sphere'"));
+	UMaterialInterface* BlueTeamMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/Game/Materials/M_BlueTeam.M_BlueTeam'"));
+	UMaterialInterface* RedTeamMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("Material'/Game/Materials/M_RedTeam.M_RedTeam'"));
+	for (auto Bot : BotsParams)
+	{
+		AStaticMeshActor* SpawnedBot = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Bot.Position, Bot.Direction.Rotator());
+		if (Mesh && BlueTeamMaterial && RedTeamMaterial)
+		{
+			SpawnedBot->GetStaticMeshComponent()->SetStaticMesh(Mesh);
+			SpawnedBot->GetStaticMeshComponent()->SetMaterial(0, Bot.Team == ETeam::Team1 ? BlueTeamMaterial : RedTeamMaterial);
+		}
+		SpawnedBot->SetMobility(EComponentMobility::Movable);
+		BotsMap.Add(SpawnedBot, Bot.Team);
+	}
+}
+
 void BotsSystem::LogBotsParameters(FBotParam BotParam)
 {
 	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
 	UE_LOG(BotSystem, Display, TEXT("---BotParams---"));
-	UE_LOG(BotSystem, Display, TEXT("Position: X:%f, Y:%f, Z:%f"), BotParam.Position.X, BotParam.Position.Y, BotParam.Position.Z);
-	UE_LOG(BotSystem, Display, TEXT("Direction: X:%f, Y:%f, Z:%f"), BotParam.Direction.X, BotParam.Direction.Y, BotParam.Direction.Z);
+	UE_LOG(BotSystem, Display, TEXT("Position: %s"), *BotParam.Position.ToString());
+	UE_LOG(BotSystem, Display, TEXT("Direction: %s"), *BotParam.Direction.ToString());
 	UE_LOG(BotSystem, Display, TEXT("IsControlled: %s"), BotParam.IsControlled ? TEXT("true") : TEXT("false"));
 	UE_LOG(BotSystem, Display, TEXT("Team: %s"), *UEnum::GetValueAsString(BotParam.Team));
 	UE_LOG(BotSystem, Display, TEXT("Role: %s"), *UEnum::GetValueAsString(BotParam.Role));
 }
 
-void BotsSystem::SetBotsParams(TArray<FBotParam>& BotsParamsArray)
+void BotsSystem::LogZonesParameters(FZone ZoneParams)
+{
+	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
+	UE_LOG(BotSystem, Display, TEXT("---ZoneParams---"));
+	UE_LOG(BotSystem, Display, TEXT("Position: Min:%s, Max:%s"), *ZoneParams.Min.ToString(), *ZoneParams.Max.ToString());
+	UE_LOG(BotSystem, Display, TEXT("Direction: %s"), *ZoneParams.Direction.ToString());
+	UE_LOG(BotSystem, Display, TEXT("Team: %s"), *UEnum::GetValueAsString(ZoneParams.ZoneTeam));
+	UE_LOG(BotSystem, Display, TEXT("Role: %s"), *UEnum::GetValueAsString(ZoneParams.ZoneRole));
+}
+
+void BotsSystem::SetBotsParams(TArray<FBotParam>& BotsParamsArray, FVector BoxForward)
 {
 	FBotParam BotParams;
 	
@@ -115,11 +162,13 @@ void BotsSystem::SetBotsParams(TArray<FBotParam>& BotsParamsArray)
 		{
 			BotParams.Color = FColor::Red;
 			BotParams.Team = ETeam::Team2;
+			BotParams.ViewDirection = -BoxForward;
 		}
 		else
 		{
 			BotParams.Color = FColor::Blue;
 			BotParams.Team = ETeam::Team1;
+			BotParams.ViewDirection = BoxForward;
 		}
 		BotParams.Role = static_cast<ECharacterPosition>(i/2 + 1);
 		BotsParamsArray.Add(BotParams);
@@ -262,6 +311,8 @@ void BotsSystem::SetBotsGoalPositions(ATriggerBox* MatchAreaBox, EIHMatchGameMod
 
 void BotsSystem::SetBotsDefaultPositions(ATriggerBox* MatchAreaBox, EIHMatchGameMode MatchGameMode, TArray<FBotParam>& BotsParamsArray)
 {
+	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
+	UE_LOG(BotSystem, Display, TEXT("---SetBotsDefaultParams---"));
 	FVector BlueLineCenterTeam1 = GetBlueLineCenterPoint(MatchAreaBox, ETeam::Team1);
 	FVector BlueLineCenterTeam2 = GetBlueLineCenterPoint(MatchAreaBox, ETeam::Team2);
 	
@@ -298,7 +349,9 @@ void BotsSystem::SetBotsDefaultPositions(ATriggerBox* MatchAreaBox, EIHMatchGame
 void BotsSystem::SetPuckParams(ATriggerBox* MatchAreaBox, FPuckParam& Puck)
 {
 	FTransform CenterTransform = MatchAreaBox->GetActorTransform();
+	FVector ForwardVector = MatchAreaBox->GetActorForwardVector();
 	Puck.Position = CenterTransform.TransformPosition(FVector(0,1,0));
+	Puck.Direction = ForwardVector.ToOrientationQuat();
 }
 
 void BotsSystem::SetGoalsParams(UBoxComponent* Box, TArray<FGoalParams>& GoalsParams)
@@ -322,19 +375,87 @@ void BotsSystem::SetGoalsParams(UBoxComponent* Box, TArray<FGoalParams>& GoalsPa
 	
 }
 
+void BotsSystem::SetZones(TArray<FZone>& Zones, UBoxComponent* Box)
+{
+	FVector BoxExtent = Box->GetScaledBoxExtent();
+	
+	//Create Zones
+	FZone Team1LeftZone;
+	FZone Team1RightZone;
+	FZone Team1CenterZone;
+	
+	FZone Team2LeftZone;
+	FZone Team2RightZone;
+	FZone Team2CenterZone;
+	
+	//First Team Set Zones
+	Team1LeftZone.Min = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X, -BoxExtent.Y, 0));
+	Team1LeftZone.Max = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X * 0.3, 0, 0));
+	Team1LeftZone.ZoneRole = ECharacterPosition::LeftWing;
+	Team1LeftZone.Direction = Box->GetForwardVector().ToOrientationQuat();
+	Team1LeftZone.ZoneTeam = ETeam::Team1;
+	
+	Team1RightZone.Min = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X, 0, 0));
+	Team1RightZone.Max = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X * 0.3, BoxExtent.Y, 0));
+	Team1RightZone.ZoneRole = ECharacterPosition::RightWing;
+	Team1RightZone.Direction = Box->GetForwardVector().ToOrientationQuat();
+	Team1RightZone.ZoneTeam = ETeam::Team1;
+	
+	Team1CenterZone.Min = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X * 0.3, -BoxExtent.Y, 0));
+	Team1CenterZone.Max = Box->GetComponentTransform().TransformPosition(FVector(0, BoxExtent.Y, 0));
+	Team1CenterZone.ZoneRole = ECharacterPosition::Center;
+	Team1CenterZone.Direction = Box->GetForwardVector().ToOrientationQuat();
+	Team1CenterZone.ZoneTeam = ETeam::Team1;
+	
+	//Second Team Set Zones
+	FVector ZoneTeam2ForwardVector = Box->GetForwardVector() * -1;
+	
+	Team2LeftZone.Min = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X * 0.3, 0, 0));
+	Team2LeftZone.Max = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X, BoxExtent.Y, 0));
+	Team2LeftZone.ZoneRole = ECharacterPosition::LeftWing;
+	Team2LeftZone.Direction = ZoneTeam2ForwardVector.ToOrientationQuat();
+	Team2LeftZone.ZoneTeam = ETeam::Team2;
+	
+	Team2RightZone.Min = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X * 0.3, -BoxExtent.Y, 0));
+	Team2RightZone.Max = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X, 0, 0));
+	Team2RightZone.ZoneRole = ECharacterPosition::RightWing;
+	Team2RightZone.Direction = ZoneTeam2ForwardVector.ToOrientationQuat();
+	Team2RightZone.ZoneTeam = ETeam::Team2;
+	
+	Team2CenterZone.Min = Box->GetComponentTransform().TransformPosition(FVector(0, -BoxExtent.Y, 0));
+	Team2CenterZone.Max = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X * 0.3, BoxExtent.Y, 0));
+	Team2CenterZone.ZoneRole = ECharacterPosition::Center;
+	Team2CenterZone.Direction = ZoneTeam2ForwardVector.ToOrientationQuat();
+	Team2CenterZone.ZoneTeam = ETeam::Team2;
+	
+	//Add Zones To Array
+	Zones.Add(Team1LeftZone);
+	Zones.Add(Team1RightZone);
+	Zones.Add(Team1CenterZone);
+	
+	Zones.Add(Team2LeftZone);
+	Zones.Add(Team2RightZone);
+	Zones.Add(Team2CenterZone);
+
+	for (auto Zone : Zones)
+	{
+		LogZonesParameters(Zone);
+	}
+}
+
 void BotsSystem::UpdateBotsDebug(UWorld* World, TArray<FBotParam> BotsParams)
 {
 	for (int i = 0; i < BotsParams.Num(); ++i)
 	{
 		if(BotsParams[i].IsControlled)
 		{
-			DrawDebug(World, BotsParams[i].Position, FColor::Yellow);
-			DrawDirectionDebug (World, BotsParams[i], FColor::Yellow);
+			DrawDebug(World, BotsParams[i].Position, FColor::Yellow, 50);
+			DrawDirectionDebug (World, BotsParams[i], FColor::Yellow, 50);
 		}
 		else
 		{
-			DrawDebug(World, BotsParams[i].Position, BotsParams[i].Color);
-			DrawDirectionDebug (World, BotsParams[i], BotsParams[i].Color);
+			DrawDebug(World, BotsParams[i].Position, BotsParams[i].Color, 50);
+			DrawDirectionDebug (World, BotsParams[i], BotsParams[i].Color, 50);
 		}
 	}
 }
@@ -480,7 +601,6 @@ TMap<ECharacterPosition, FVector> BotsSystem::GetCenterPoints(ATriggerBox* Match
 	
 	FVector RadiusOffset = BoxCenter + BoxForward * BoxExtent.X * 0.18; //0.18 - на эту часть делится половина поля, для нахождения точки, лежащей на окружности центральной зоны
 	float Radius = FVector::Distance(BoxCenter, RadiusOffset);
-	UE_LOG(LogTemp, Error, TEXT("%s"), *BoxCenter.ToString());
 	
 	TMap<ECharacterPosition, FVector> PointsArray;
 

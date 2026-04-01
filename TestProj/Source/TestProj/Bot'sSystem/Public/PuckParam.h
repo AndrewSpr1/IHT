@@ -10,6 +10,11 @@ struct FPuckParam
 	
 	UPROPERTY(Category=PuckParameters, EditAnywhere, BlueprintReadWrite);
 	FVector Position = FVector::ZeroVector;
+	
+	UPROPERTY()
+	FQuat Direction = FVector(0,0,0).ToOrientationQuat();
+	
+	FVector Velocity = FVector(0,0,0);
 
 	UPROPERTY(Category=PuckParameters, EditAnywhere, BlueprintReadWrite);
 	bool IsPuckInGame = false;

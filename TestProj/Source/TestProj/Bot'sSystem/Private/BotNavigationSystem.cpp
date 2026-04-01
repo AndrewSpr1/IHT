@@ -3,23 +3,50 @@
 
 #include "DrawDebugHelpers.h"
 #include "Components/BoxComponent.h"
+#include "Math/UnitConversion.h"
 #include "TestProj/Bot'sSystem/Public/BotsSystem.h"
 
+#define NAV_SYSTEM_LOG_ENABLED 0
+
+#if NAV_SYSTEM_LOG_ENABLED
+	#define NAV_SYSTEM_LOG(Category, Verbosity, Format, ...) \
+		UE_LOG(Category, Verbosity, Format, ##__VA_ARGS__)
+#else
+	#define NAV_SYSTEM_LOG(Category, Verbosity, Format, ...)
+#endif
+
+DEFINE_LOG_CATEGORY_STATIC(NavigationSystem, Log, All)
+
+ 
+
 void BotNavigationSystem::Update(float DeltaTime, APlayerController* PC, UBoxComponent* Box, UWorld* World, ETeam Team,
-                                 TArray<FBotParam>& BotsParams, FPuckParam& PuckParams, TArray<FZone>& Zones, TArray<FGoalParams> GoalsParams)
+                                 TArray<FBotParam>& BotsParams, FPuckParam& PuckParams, TArray<FZone>& Zones, TArray<FGoalParams> GoalsParams,
+                                 const float Radius, const float OffsetUnderPuck, const float AngleBetweenBots, const float RightBotAngle, const float LeftBotAngle)
 {
+	const FVector BoxCenter = Box->GetComponentLocation();
+	const FVector BoxForward = Box->GetForwardVector();
+	const FVector BoxRight = Box->GetRightVector();
+	const FVector BoxExtent = Box->GetScaledBoxExtent();
+	
 	if (PuckParams.IsControlled)
 	{
 		UpdatePuckPosition(DeltaTime, Box, PC, PuckParams);
 	}
-	UpdateBotsPosition(World, DeltaTime, Box, Zones, BotsParams, PuckParams, GoalsParams, ETeam::Team1);
-	//UpdateBotsPosition(World, DeltaTime, Box, Zones, BotsParams, PuckParams, GoalsParams, ETeam::Team2);
+	
+	for (auto& Bot : BotsParams)
+	{
+		const float DU = GetDU(BoxCenter, BoxExtent, Bot.ViewDirection, PuckParams.Position);
+		const float DV = GetDV(BoxCenter, BoxExtent, Bot.ViewDirection, PuckParams.Position);
+		BotPositionManagementNeutral(World, Bot, Box, DU, DV, PuckParams, Radius, AngleBetweenBots, RightBotAngle, LeftBotAngle);
+	}
+	
+	
 }
 
 void BotNavigationSystem::Init(APlayerController* PC, UBoxComponent* Box, UWorld* World, TArray<FBotParam>& BotsParams,
 	FPuckParam& PuckParams, TArray<FZone>& Zones)
 {
-	SetZones(Zones, Box);
+	
 }
 
 FVector BotNavigationSystem::FindMouseClickPosition(APlayerController* PC)
@@ -124,64 +151,7 @@ void BotNavigationSystem::StopControl(TArray<FBotParam>& BotsParams, FPuckParam&
 	}
 }
 
-void BotNavigationSystem::SetZones(TArray<FZone>& Zones, UBoxComponent* Box)
-{
-	FVector BoxExtent = Box->GetScaledBoxExtent();
-	
-	FZone Team1LeftZone;
-	FZone Team1RightZone;
-	FZone Team1CenterZone;
-	
-	FZone Team2LeftZone;
-	FZone Team2RightZone;
-	FZone Team2CenterZone;
-	
-	Team1LeftZone.Min = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X, -BoxExtent.Y, 0));
-	Team1LeftZone.Max = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X * 0.3, 0, 0));
-	Team1LeftZone.ZoneRole = ECharacterPosition::LeftWing;
-	Team1LeftZone.Direction = Box->GetForwardVector().ToOrientationQuat();
-	Team1LeftZone.ZoneTeam = ETeam::Team1;
-	
-	Team1RightZone.Min = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X, 0, 0));
-	Team1RightZone.Max = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X * 0.3, BoxExtent.Y, 0));
-	Team1RightZone.ZoneRole = ECharacterPosition::RightWing;
-	Team1RightZone.Direction = Box->GetForwardVector().ToOrientationQuat();
-	Team1RightZone.ZoneTeam = ETeam::Team1;
-	
-	Team1CenterZone.Min = Box->GetComponentTransform().TransformPosition(FVector(-BoxExtent.X * 0.3, -BoxExtent.Y, 0));
-	Team1CenterZone.Max = Box->GetComponentTransform().TransformPosition(FVector(0, BoxExtent.Y, 0));
-	Team1CenterZone.ZoneRole = ECharacterPosition::Center;
-	Team1CenterZone.Direction = Box->GetForwardVector().ToOrientationQuat();
-	Team1CenterZone.ZoneTeam = ETeam::Team1;
-	
-	FVector ZoneTeam2ForwardVector = Box->GetForwardVector() * -1;
-	
-	Team2LeftZone.Min = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X * 0.3, 0, 0));
-	Team2LeftZone.Max = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X, BoxExtent.Y, 0));
-	Team2LeftZone.ZoneRole = ECharacterPosition::LeftWing;
-	Team2LeftZone.Direction = ZoneTeam2ForwardVector.ToOrientationQuat();
-	Team2LeftZone.ZoneTeam = ETeam::Team2;
-	
-	Team2RightZone.Min = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X * 0.3, -BoxExtent.Y, 0));
-	Team2RightZone.Max = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X, 0, 0));
-	Team2RightZone.ZoneRole = ECharacterPosition::RightWing;
-	Team2RightZone.Direction = ZoneTeam2ForwardVector.ToOrientationQuat();
-	Team2RightZone.ZoneTeam = ETeam::Team2;
-	
-	Team2CenterZone.Min = Box->GetComponentTransform().TransformPosition(FVector(0, -BoxExtent.Y, 0));
-	Team2CenterZone.Max = Box->GetComponentTransform().TransformPosition(FVector(BoxExtent.X * 0.3, BoxExtent.Y, 0));
-	Team2CenterZone.ZoneRole = ECharacterPosition::Center;
-	Team2CenterZone.Direction = ZoneTeam2ForwardVector.ToOrientationQuat();
-	Team2CenterZone.ZoneTeam = ETeam::Team2;
-	
-	Zones.Add(Team1LeftZone);
-	Zones.Add(Team1RightZone);
-	Zones.Add(Team1CenterZone);
-	
-	Zones.Add(Team2LeftZone);
-	Zones.Add(Team2RightZone);
-	Zones.Add(Team2CenterZone);
-}
+//---------------------------------------Didn't Use---------------------------------------
 
 FZone BotNavigationSystem::GetZoneWithRole(TArray<FZone> Zones, ECharacterPosition Role, ETeam Team)
 {
@@ -380,7 +350,7 @@ FVector BotNavigationSystem::GetPointToGoals(FBotParam TargetBot, FVector Target
 	
 	FVector ZoneForwardVector = TargetZone.Direction.GetForwardVector();
 	
-	float Alpha = DistanceToPuck / 2000;
+	float Alpha = DistanceToPuck / 3000;
 	
 	FVector Result = FMath::Lerp(PositionNearGoals, TargetPosition, Alpha);
 	
@@ -411,6 +381,350 @@ bool BotNavigationSystem::IsNearestToGoal(TArray<FBotParam> BotsParams, FBotPara
 		}
 	}
 	return true;
+}
+
+FVector BotNavigationSystem::BotDefaultPosition(ECharacterPosition Role, ETeam Team, const FVector PuckPos, const FVector BoxForward,
+	const float OffsetBots, const float OffsetUnderPuck)
+{
+	FVector ResultPosition;
+	
+	const FVector ViewDirection = Team == ETeam::Team1 ? BoxForward * -1 : BoxForward;
+	const FVector OffsetFromPuck      = PuckPos + ViewDirection * OffsetUnderPuck;
+
+	switch (Role)
+	{
+		case ECharacterPosition::Center:
+			{
+				ResultPosition = GetBotPositionNearPuck(ViewDirection, PuckPos, PuckPos, 100);
+				break;
+			}
+		case ECharacterPosition::LeftWing:
+			{
+				ResultPosition = OffsetFromPuck - (PuckPos - OffsetFromPuck).ToOrientationQuat().GetRightVector() * OffsetBots;
+				break;
+			}
+		case ECharacterPosition::RightWing:
+			{
+				ResultPosition = OffsetFromPuck + (PuckPos - OffsetFromPuck).ToOrientationQuat().GetRightVector() * OffsetBots;
+				break;
+			}
+	}
+	
+	return ResultPosition;
+}
+
+FVector BotNavigationSystem::BotOffsetFromSide(ETeam Team, const FVector BotPos, const FVector PuckPos, const FVector BoxCenter,
+	const FVector BoxForward, const FVector BoxRight, const FVector BoxExtent, const float OffsetBots,
+	const float OffsetUnderPuck)
+{
+	FVector ResultPosition;
+	
+	const FVector Dir                  = PuckPos - BoxCenter;
+	const float PuckDotProductToCenter = BoxRight | Dir;
+	
+	const FVector ViewDirection = Team == ETeam::Team1 ? BoxForward * -1 : BoxForward;
+	FVector OffsetFromPuck      = PuckPos + ViewDirection * OffsetUnderPuck;
+		
+	FVector BotDir = (BotPos - PuckPos).GetSafeNormal();
+	const float BotDotProductToPuck = BotDir | BoxRight;
+
+	FVector2D Input            = FVector2D(BotDotProductToPuck < 0 ? -BoxExtent.Y : BoxExtent.Y, 0);
+	FVector2D Output           = FVector2D(0, OffsetBots);
+	const float ClampedOffset  = FMath::GetMappedRangeValueClamped(Input, Output, PuckDotProductToCenter);
+		
+	if (BotDotProductToPuck < 0 && PuckDotProductToCenter < 0)
+	{
+		ResultPosition = OffsetFromPuck - BoxRight * ClampedOffset;
+		return ResultPosition;
+	}
+	if (BotDotProductToPuck > 0 && PuckDotProductToCenter > 0)
+	{
+		ResultPosition = OffsetFromPuck + BoxRight * ClampedOffset;
+		return ResultPosition;
+	}
+	
+	return BotPos;
+}
+
+//--------------------------------------------Navigation with Radius-----------------------------------------
+
+FVector BotNavigationSystem::ClampToZone(FVector Pos, UBoxComponent* Box)
+{
+	FTransform BoxTransform = Box->GetComponentTransform();
+	FVector Position = BoxTransform.InverseTransformPosition(Pos);
+	FVector ClosestPoint = BoxTransform.InverseTransformPosition(Pos);
+	
+	FVector BoxExtent = Box->GetScaledBoxExtent();
+	FVector Min = FVector(-BoxExtent.X, -BoxExtent.Y, 0);
+	FVector Max = FVector(BoxExtent.X, BoxExtent.Y, 0);
+	
+	if (Position.X < Min.X)
+	{
+		ClosestPoint.X = Min.X;
+	}
+	else if (Position.X > Max.X)
+	{
+		ClosestPoint.X = Max.X;
+	}
+	
+	if (Position.Y < Min.Y)
+	{
+		ClosestPoint.Y = Min.Y;
+	}
+	else if (Position.Y > Max.Y)
+	{
+		ClosestPoint.Y = Max.Y;
+	}
+	ClosestPoint.Z = 0;
+	
+	ClosestPoint = BoxTransform.TransformPosition(ClosestPoint);
+	
+	return ClosestPoint;
+}
+
+void BotNavigationSystem::BotPositionManagementNeutral(
+	UWorld* World
+	, FBotParam& BotParams
+	, UBoxComponent* Box
+	, const float DU
+	, const float DV
+	, FPuckParam PuckParams
+	, const float Radius
+	, const float AngleBetweenBots
+	, const float RightBotAngle
+	, const float LeftBotAngle)
+{
+	
+	FVector SectorDirection = BotParams.ViewDirection * -1;
+	float CurrentDU = DU;
+	
+	
+	auto AngleForDefence = GetOwnAngleForDefence(AngleBetweenBots, CurrentDU, DV);								//remade
+	auto AngleForAttack  = GetOwnAngleForAttack(AngleBetweenBots, CurrentDU, DV, 60);				//new
+	
+	auto OwnRightAngle = AngleForDefence;
+	auto OwnLeftAngle  = AngleForDefence;
+	
+	
+	auto MainRadiusForDefence = GetMainRadiusForDefence(Radius, DU, DV, 500);
+	
+	auto OwnRightRadius = MainRadiusForDefence + GetOwnRadiusForDefence(DU, DV, 800);						//new
+	auto OwnLeftRadius  = MainRadiusForDefence + GetOwnRadiusForDefence(DU, DV, 800, false);		//new
+
+	
+	const auto MainAngleForAttack  = GetMainVectorAngle(AngleBetweenBots, DU, DV, ETeamTactic::Attack);			//remade
+	const auto MainAngleForDefence = GetMainVectorAngle(AngleBetweenBots, CurrentDU, DV, ETeamTactic::Defence);	//remade
+	
+	FVector Direction = SectorDirection.RotateAngleAxis(MainAngleForAttack + MainAngleForDefence, FVector::UpVector);
+	
+	
+	
+	BotParams.Position = GetPointsOnCircle(
+		BotParams.Role
+		, PuckParams.Position
+		, SectorDirection
+		, Direction
+		, AngleBetweenBots
+		, Radius
+		, OwnLeftAngle
+		, OwnRightAngle
+		, OwnLeftRadius
+		, OwnRightRadius);
+	
+	BotParams.Position = ClampToZone(BotParams.Position, Box);
+	
+}
+
+FVector BotNavigationSystem::GetPointsOnCircle(
+	ECharacterPosition Role
+	, const FVector Center
+	, const FVector DefaultSectorDirection
+	, const FVector RotatedSectorDirection
+	, const float Angle
+	, const float Radius
+	, const float LeftAngle
+	, const float RightAngle
+	, const float LeftRadius
+	, const float RightRadius)
+{
+	
+	const FVector NormalizeSectorDirection = RotatedSectorDirection.GetSafeNormal();
+	
+	switch (Role)
+	{
+		case ECharacterPosition::Center:
+			{
+				return GetBotPositionNearPuck(DefaultSectorDirection, Center, Center, 100);
+			}
+		case ECharacterPosition::LeftWing:
+			{
+				const auto ResultsAngle = LeftAngle == 0 ?  Angle : LeftAngle;
+				const auto ResultRadius = LeftRadius == 0 ? Radius : LeftRadius;
+				const FVector Dir = NormalizeSectorDirection.RotateAngleAxis(abs(ResultsAngle), FVector::UpVector);
+				return Center + Dir * ResultRadius;
+			}
+		case ECharacterPosition::RightWing:
+			{
+				const auto ResultsAngle = RightAngle == 0 ?  Angle : RightAngle;
+				const auto ResultRadius = RightRadius == 0 ? Radius : RightRadius;
+				const FVector Dir = NormalizeSectorDirection.RotateAngleAxis(-abs(ResultsAngle), FVector::UpVector);
+				return Center + Dir * ResultRadius;
+			}
+		
+		default:
+		break;
+	}
+
+	return FVector::ZeroVector;
+}
+
+float BotNavigationSystem::GetMainVectorAngle(const float AngleBetweenBots, const float DU, const float DV, const ETeamTactic Tactic)
+{
+	switch (Tactic)
+	{
+	case ETeamTactic::None:
+		return DU * AngleBetweenBots;
+	case ETeamTactic::Attack:
+		if (DV > 0) return DU * AngleBetweenBots;
+		break;
+	case ETeamTactic::Defence:
+		if (DV < 0) return DU * AngleBetweenBots;
+		break;
+	}
+	return 0;
+}
+
+float BotNavigationSystem::GetOwnAngleForDefence(const float AngleBetweenBots, float& DU, const float DV,
+	const float MaxAngleOffset)
+{
+	if (DV < 0)
+	{
+		const FVector2D Input1  = FVector2D(-0.4f, -0.8f);
+		const FVector2D Output1 = FVector2D(0, MaxAngleOffset);
+		float ClampDV           = FMath::GetMappedRangeValueClamped(Input1, Output1, DV);
+		
+		auto Angle = AngleBetweenBots + ClampDV;
+		
+		const FVector2D Input  = FVector2D(60.0f, MaxAngleOffset);
+		const FVector2D Output = FVector2D(DU, DU * -1);
+		float ClampAngle       = FMath::GetMappedRangeValueClamped(Input, Output, Angle);
+		
+		DU = ClampAngle;
+		return Angle;
+	}
+	return 0;
+}
+
+
+float BotNavigationSystem::GetAngleForDefence(const float AngleBetweenBots, float& DU, const float DV, const float MaxAngleOffset)
+{
+	if (DV < 0)
+	{
+		const auto DVx2 = FMath::Clamp(DV*2, -1.0f, 1.0f);
+		auto Angle = AngleBetweenBots + MaxAngleOffset * abs(DVx2);
+		
+		
+		const FVector2D Input = FVector2D(70.0f, 90.0f);
+		const FVector2D Output = FVector2D(DU, DU * -1);
+		float Clamp = FMath::GetMappedRangeValueClamped(Input, Output, Angle);
+		
+		DU = Clamp;
+		return Angle;
+	}
+	return 0;
+}
+
+float BotNavigationSystem::GetOwnAngleForAttack(const float AngleBetweenBots, float& DU, const float DV, const float MaxAngleOffset)
+{
+	if (DV > 0)
+	{
+		const auto DVx2 = FMath::Clamp(DV*2, -1.0f, 1.0f);
+		auto Angle = AngleBetweenBots + MaxAngleOffset * abs(DVx2);
+		
+		
+		const FVector2D Input = FVector2D(70.0f, AngleBetweenBots + MaxAngleOffset);
+		const FVector2D Output = FVector2D(DU, DU * -1);
+		float Clamp = FMath::GetMappedRangeValueClamped(Input, Output, Angle);
+		
+		DU = Clamp;
+		return Angle;
+	}
+	return 0;
+}
+
+float BotNavigationSystem::GetMainRadiusForDefence(const float CurrentRadius, const float DU, const float DV,
+	const float MinRadius)
+{
+	if (DV < 0)
+	{
+		auto X = MinRadius + (CurrentRadius - MinRadius) * ((FMath::Cos(2 * PI * DV) + 1) / 2);
+		return X;
+		
+	}
+	return CurrentRadius;
+}
+
+float BotNavigationSystem::GetOwnRadiusForDefence(const float DU, const float DV, const float MaxRadius, const bool bIsRight)
+{
+	if (DV < 0)
+	{
+		if (bIsRight)
+		{
+			if (DU < 0) return MaxRadius * abs(DV) * abs(DU);
+		}
+		else
+		{
+			if (DU > 0) return MaxRadius * abs(DV) * abs(DU);
+		}
+	}
+	return 0;
+}
+
+
+FVector BotNavigationSystem::GetBotPositionNearPuck(const FVector ViewDirection, const FVector PuckLocation, const FVector CurrentBotLocation, const float Offset)
+{
+	if (FVector::VectorPlaneProject(PuckLocation - CurrentBotLocation, FVector::UpVector).Size() < Offset)
+	{
+		return PuckLocation + ViewDirection * Offset;
+	}
+	return CurrentBotLocation;
+}
+
+float BotNavigationSystem::GetDU(const FVector BoxCenter, const FVector BoxExtent, const FVector ViewDirection, const FVector PuckPos)
+{
+	const auto Dir = PuckPos - BoxCenter;
+	const auto Alpha = ViewDirection.ToOrientationQuat().GetRightVector() | Dir;
+	
+	const auto Size = abs(BoxExtent.Y);
+	const auto DU   = ClampFromMinusOneToOne(Size, Alpha);
+	
+	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("------------"));
+	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("ViewDirection: %s"), *ViewDirection.ToString());
+	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("DU: %f"), DU);
+	
+	return DU;
+}
+
+float BotNavigationSystem::GetDV(const FVector BoxCenter, const FVector BoxExtent, const FVector ViewDirection, const FVector PuckPos)
+{
+	const auto Dir = PuckPos - BoxCenter;
+	const auto Alpha = ViewDirection | Dir;
+	
+	const auto Size = abs(BoxExtent.X);
+	const auto DV   = ClampFromMinusOneToOne(Size, Alpha);
+	
+	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("------------"));
+	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("ViewDirection: %s"), *ViewDirection.ToString());
+	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("DV: %f"), DV);
+	
+	return DV;
+}
+
+float BotNavigationSystem::ClampFromMinusOneToOne(const float Size, const float Alpha)
+{
+	const FVector2D Input  = FVector2D(-Size, Size);
+	const FVector2D Output = FVector2D(-1, 1);
+	return FMath::GetMappedRangeValueClamped(Input, Output, Alpha);
 }
 
 
