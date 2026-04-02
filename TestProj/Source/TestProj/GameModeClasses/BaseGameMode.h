@@ -24,6 +24,8 @@ class TESTPROJ_API ABaseGameMode : public ATestProjGameModeBase
 	UPROPERTY()
 	UBoxComponent* Box;
 	
+	UPROPERTY()
+	TArray<UBoxComponent*> GoalsBoxes;
 
 public:
 

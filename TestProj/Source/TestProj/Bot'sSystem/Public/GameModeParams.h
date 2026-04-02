@@ -64,4 +64,7 @@ struct FGameModeParams
 
 	UPROPERTY()
 	ATriggerBox* MatchAreaBox = nullptr;
+	
+	UPROPERTY()
+	TArray<ATriggerBox*> GoalsTriggerBoxes;
 };

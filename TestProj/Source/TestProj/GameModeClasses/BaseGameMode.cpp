@@ -31,6 +31,7 @@ void ABaseGameMode::Tick(float DeltaTime)
 	BotNavigationSystem::Update(DeltaTime,
 		PC,
 		Box,
+		GoalsBoxes,
 		GetWorld(),
 		ETeam::Team1,
 		GameModeParams.BotsParamArray,
@@ -45,7 +46,7 @@ void ABaseGameMode::Tick(float DeltaTime)
 	
 	if (GameModeParams.bUseActorBots)
 	{
-		BotsMovementSystem::Update(DeltaTime, GameModeParams.BotsMap, GameModeParams.BotsParamArray);
+		BotsMovementSystem::Update(DeltaTime, GameModeParams.BotsMap, GameModeParams.BotsParamArray, GoalsBoxes);
 	}
 	
 }
@@ -69,12 +70,17 @@ void ABaseGameMode::BeginPlay()
 		GameModeParams.PuckParam,
 		GameModeParams.GlobalCamera,
 		GameModeParams.MatchAreaBox,
+		GameModeParams.GoalsTriggerBoxes,
 		GameModeParams.MatchGameMode,
 		GameModeParams.GoalToTeam,
 		GameModeParams.GoalParams,
 		GameModeParams.Zones
 		);
 	Box = Cast<UBoxComponent>(GameModeParams.MatchAreaBox->GetCollisionComponent());
+	for (auto TriggerBox : GameModeParams.GoalsTriggerBoxes)
+	{
+		GoalsBoxes.Add(Cast<UBoxComponent>(TriggerBox->GetCollisionComponent()));
+	}
 	BotNavigationSystem::Init(PC, Box, GetWorld(), GameModeParams.BotsParamArray, GameModeParams.PuckParam, GameModeParams.Zones);
 }
 

@@ -20,6 +20,7 @@ namespace BotsSystem
 		FPuckParam& PuckParams, 
 		AGlobalCamera*& GlobalCamera, 
 		ATriggerBox*& MatchAreaBox, 
+		TArray<ATriggerBox*>& GoalsTriggerBoxes,
 		EIHMatchGameMode MatchGameMode, 
 		ETeam GoalToTeam,
 		TArray<FGoalParams>& GoalsParams,
@@ -27,7 +28,7 @@ namespace BotsSystem
 		);
 
 	//Spawn and find functions
-	void FindBoxActor(UWorld* World, ATriggerBox*& MatchAreaBox);
+	void FindBoxActor(UWorld* World, ATriggerBox*& MatchAreaBox, TArray<ATriggerBox*>& GoalsTriggerBoxes);
 	void CameraSpawn(UWorld* World, AGlobalCamera*& GlobalCamera);
 	void SetGlobalCameraView(APlayerController* PC, AGlobalCamera* GlobalCamera);
 	

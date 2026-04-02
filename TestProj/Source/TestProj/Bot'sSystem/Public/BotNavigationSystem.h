@@ -12,6 +12,7 @@ namespace BotNavigationSystem
 	void Update(float DeltaTime,
 		APlayerController* PC,
 		UBoxComponent* Box,
+		TArray<UBoxComponent*> GoalsBoxes,
 		UWorld* World,
 		ETeam Team,
 		TArray<FBotParam>& BotsParams,
@@ -68,7 +69,9 @@ namespace BotNavigationSystem
 	
 	FVector ClampToZone(FVector Pos, UBoxComponent* Box);
 	
-	void BotPositionManagementNeutral(UWorld* World, FBotParam& BotParams, UBoxComponent* Box, const float DU, const float DV, FPuckParam PuckParams,
+	FVector UnclampToZone(FVector Pos, UBoxComponent* Box);
+	
+	void BotPositionManagementNeutral(UWorld* World, FBotParam& BotParams, UBoxComponent* Box, TArray<UBoxComponent*> GoalsBoxes, const float DU, const float DV, FPuckParam PuckParams,
 		const float Radius, const float AngleBetweenBots, const float RightBotAngle, const float LeftBotAngle);
 	
 	FVector GetPointsOnCircle(

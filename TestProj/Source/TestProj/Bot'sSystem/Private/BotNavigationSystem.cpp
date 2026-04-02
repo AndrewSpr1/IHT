@@ -19,9 +19,22 @@ DEFINE_LOG_CATEGORY_STATIC(NavigationSystem, Log, All)
 
  
 
-void BotNavigationSystem::Update(float DeltaTime, APlayerController* PC, UBoxComponent* Box, UWorld* World, ETeam Team,
-                                 TArray<FBotParam>& BotsParams, FPuckParam& PuckParams, TArray<FZone>& Zones, TArray<FGoalParams> GoalsParams,
-                                 const float Radius, const float OffsetUnderPuck, const float AngleBetweenBots, const float RightBotAngle, const float LeftBotAngle)
+void BotNavigationSystem::Update(
+	float DeltaTime
+	, APlayerController* PC
+	, UBoxComponent* Box
+	, TArray<UBoxComponent*> GoalsBoxes
+	, UWorld* World
+	, ETeam Team
+	, TArray<FBotParam>& BotsParams
+	, FPuckParam& PuckParams
+	, TArray<FZone>& Zones
+	, TArray<FGoalParams> GoalsParams
+	, const float Radius
+	, const float OffsetUnderPuck
+	, const float AngleBetweenBots
+	, const float RightBotAngle
+	, const float LeftBotAngle)
 {
 	const FVector BoxCenter = Box->GetComponentLocation();
 	const FVector BoxForward = Box->GetForwardVector();
@@ -37,7 +50,7 @@ void BotNavigationSystem::Update(float DeltaTime, APlayerController* PC, UBoxCom
 	{
 		const float DU = GetDU(BoxCenter, BoxExtent, Bot.ViewDirection, PuckParams.Position);
 		const float DV = GetDV(BoxCenter, BoxExtent, Bot.ViewDirection, PuckParams.Position);
-		BotPositionManagementNeutral(World, Bot, Box, DU, DV, PuckParams, Radius, AngleBetweenBots, RightBotAngle, LeftBotAngle);
+		BotPositionManagementNeutral(World, Bot, Box, GoalsBoxes, DU, DV, PuckParams, Radius, AngleBetweenBots, RightBotAngle, LeftBotAngle);
 	}
 	
 	
@@ -452,7 +465,7 @@ FVector BotNavigationSystem::ClampToZone(FVector Pos, UBoxComponent* Box)
 {
 	FTransform BoxTransform = Box->GetComponentTransform();
 	FVector Position = BoxTransform.InverseTransformPosition(Pos);
-	FVector ClosestPoint = BoxTransform.InverseTransformPosition(Pos);
+	FVector ClosestPoint = Position;
 	
 	FVector BoxExtent = Box->GetScaledBoxExtent();
 	FVector Min = FVector(-BoxExtent.X, -BoxExtent.Y, 0);
@@ -482,10 +495,38 @@ FVector BotNavigationSystem::ClampToZone(FVector Pos, UBoxComponent* Box)
 	return ClosestPoint;
 }
 
+FVector BotNavigationSystem::UnclampToZone(FVector Pos, UBoxComponent* Box)
+{
+	FVector BoxCenter = Box->GetComponentLocation();
+	FVector BoxExtent = Box->GetScaledBoxExtent();
+	
+	FVector Local = Pos - BoxCenter;
+	
+	bool bIsInside = abs(Local.X) <= BoxExtent.X && abs(Local.Y) <= BoxExtent.Y;
+	
+	if (bIsInside)
+	{
+		FVector DistToEdge = BoxExtent - FVector(abs(Local.X), abs(Local.Y), 0);
+		
+		if (DistToEdge.X < DistToEdge.Y)
+		{
+			Local.X = (Local.X > 0 ? BoxExtent.X : -BoxExtent.X);
+		}
+		else 
+		{
+			Local.Y = (Local.Y > 0 ? BoxExtent.Y : -BoxExtent.Y);
+		}
+		return BoxCenter + Local;
+	}
+	
+	return Pos;
+}
+
 void BotNavigationSystem::BotPositionManagementNeutral(
 	UWorld* World
 	, FBotParam& BotParams
 	, UBoxComponent* Box
+	, TArray<UBoxComponent*> GoalsBoxes
 	, const float DU
 	, const float DV
 	, FPuckParam PuckParams
@@ -496,27 +537,26 @@ void BotNavigationSystem::BotPositionManagementNeutral(
 {
 	
 	FVector SectorDirection = BotParams.ViewDirection * -1;
-	float CurrentDU = DU;
-	
-	
-	auto AngleForDefence = GetOwnAngleForDefence(AngleBetweenBots, CurrentDU, DV);								//remade
-	auto AngleForAttack  = GetOwnAngleForAttack(AngleBetweenBots, CurrentDU, DV, 60);				//new
-	
-	auto OwnRightAngle = AngleForDefence;
-	auto OwnLeftAngle  = AngleForDefence;
-	
-	
-	auto MainRadiusForDefence = GetMainRadiusForDefence(Radius, DU, DV, 500);
-	
-	auto OwnRightRadius = MainRadiusForDefence + GetOwnRadiusForDefence(DU, DV, 800);						//new
-	auto OwnLeftRadius  = MainRadiusForDefence + GetOwnRadiusForDefence(DU, DV, 800, false);		//new
+	auto CurrentDU = DU;
+
+
+	const auto AngleForDefence = GetOwnAngleForDefence(AngleBetweenBots, CurrentDU, DV);								//remade
+	auto AngleForAttack  = GetOwnAngleForAttack(AngleBetweenBots, CurrentDU, DV, 60);				//new(?)
+
+	const auto OwnRightAngle   = AngleForDefence;
+	const auto OwnLeftAngle    = AngleForDefence;
+
+
+	const auto MainRadiusForDefence = GetMainRadiusForDefence(Radius, DU, DV, 500);
+
+	const auto OwnRightRadius = MainRadiusForDefence + GetOwnRadiusForDefence(DU, DV, 800);						//new
+	const auto OwnLeftRadius  = MainRadiusForDefence + GetOwnRadiusForDefence(DU, DV, 800, false);		//new
 
 	
 	const auto MainAngleForAttack  = GetMainVectorAngle(AngleBetweenBots, DU, DV, ETeamTactic::Attack);			//remade
 	const auto MainAngleForDefence = GetMainVectorAngle(AngleBetweenBots, CurrentDU, DV, ETeamTactic::Defence);	//remade
-	
-	FVector Direction = SectorDirection.RotateAngleAxis(MainAngleForAttack + MainAngleForDefence, FVector::UpVector);
-	
+
+	const auto Direction = SectorDirection.RotateAngleAxis(MainAngleForAttack + MainAngleForDefence, FVector::UpVector);
 	
 	
 	BotParams.Position = GetPointsOnCircle(
@@ -532,7 +572,11 @@ void BotNavigationSystem::BotPositionManagementNeutral(
 		, OwnRightRadius);
 	
 	BotParams.Position = ClampToZone(BotParams.Position, Box);
-	
+
+	for (int i = 0; i < GoalsBoxes.Num(); ++i)
+	{
+		BotParams.Position = UnclampToZone(BotParams.Position, GoalsBoxes[i]);
+	}
 }
 
 FVector BotNavigationSystem::GetPointsOnCircle(
@@ -560,14 +604,14 @@ FVector BotNavigationSystem::GetPointsOnCircle(
 			{
 				const auto ResultsAngle = LeftAngle == 0 ?  Angle : LeftAngle;
 				const auto ResultRadius = LeftRadius == 0 ? Radius : LeftRadius;
-				const FVector Dir = NormalizeSectorDirection.RotateAngleAxis(abs(ResultsAngle), FVector::UpVector);
+				const auto Dir        = NormalizeSectorDirection.RotateAngleAxis(abs(ResultsAngle), FVector::UpVector);
 				return Center + Dir * ResultRadius;
 			}
 		case ECharacterPosition::RightWing:
 			{
 				const auto ResultsAngle = RightAngle == 0 ?  Angle : RightAngle;
 				const auto ResultRadius = RightRadius == 0 ? Radius : RightRadius;
-				const FVector Dir = NormalizeSectorDirection.RotateAngleAxis(-abs(ResultsAngle), FVector::UpVector);
+				const auto Dir        = NormalizeSectorDirection.RotateAngleAxis(-abs(ResultsAngle), FVector::UpVector);
 				return Center + Dir * ResultRadius;
 			}
 		
@@ -601,13 +645,13 @@ float BotNavigationSystem::GetOwnAngleForDefence(const float AngleBetweenBots, f
 	{
 		const FVector2D Input1  = FVector2D(-0.4f, -0.8f);
 		const FVector2D Output1 = FVector2D(0, MaxAngleOffset);
-		float ClampDV           = FMath::GetMappedRangeValueClamped(Input1, Output1, DV);
+		auto ClampDV       = FMath::GetMappedRangeValueClamped(Input1, Output1, DV);
 		
 		auto Angle = AngleBetweenBots + ClampDV;
 		
 		const FVector2D Input  = FVector2D(60.0f, MaxAngleOffset);
 		const FVector2D Output = FVector2D(DU, DU * -1);
-		float ClampAngle       = FMath::GetMappedRangeValueClamped(Input, Output, Angle);
+		auto ClampAngle   = FMath::GetMappedRangeValueClamped(Input, Output, Angle);
 		
 		DU = ClampAngle;
 		return Angle;
@@ -620,13 +664,12 @@ float BotNavigationSystem::GetAngleForDefence(const float AngleBetweenBots, floa
 {
 	if (DV < 0)
 	{
-		const auto DVx2 = FMath::Clamp(DV*2, -1.0f, 1.0f);
-		auto Angle = AngleBetweenBots + MaxAngleOffset * abs(DVx2);
+		const auto DVx2   = FMath::Clamp(DV*2, -1.0f, 1.0f);
+		auto Angle        = AngleBetweenBots + MaxAngleOffset * abs(DVx2);
 		
-		
-		const FVector2D Input = FVector2D(70.0f, 90.0f);
+		const FVector2D Input  = FVector2D(70.0f, 90.0f);
 		const FVector2D Output = FVector2D(DU, DU * -1);
-		float Clamp = FMath::GetMappedRangeValueClamped(Input, Output, Angle);
+		auto Clamp        = FMath::GetMappedRangeValueClamped(Input, Output, Angle);
 		
 		DU = Clamp;
 		return Angle;
@@ -638,13 +681,12 @@ float BotNavigationSystem::GetOwnAngleForAttack(const float AngleBetweenBots, fl
 {
 	if (DV > 0)
 	{
-		const auto DVx2 = FMath::Clamp(DV*2, -1.0f, 1.0f);
-		auto Angle = AngleBetweenBots + MaxAngleOffset * abs(DVx2);
+		const auto DVx2   = FMath::Clamp(DV*2, -1.0f, 1.0f);
+		auto Angle        = AngleBetweenBots + MaxAngleOffset * abs(DVx2);
 		
-		
-		const FVector2D Input = FVector2D(70.0f, AngleBetweenBots + MaxAngleOffset);
+		const FVector2D Input  = FVector2D(70.0f, AngleBetweenBots + MaxAngleOffset);
 		const FVector2D Output = FVector2D(DU, DU * -1);
-		float Clamp = FMath::GetMappedRangeValueClamped(Input, Output, Angle);
+		auto Clamp        = FMath::GetMappedRangeValueClamped(Input, Output, Angle);
 		
 		DU = Clamp;
 		return Angle;
@@ -695,8 +737,8 @@ float BotNavigationSystem::GetDU(const FVector BoxCenter, const FVector BoxExten
 	const auto Dir = PuckPos - BoxCenter;
 	const auto Alpha = ViewDirection.ToOrientationQuat().GetRightVector() | Dir;
 	
-	const auto Size = abs(BoxExtent.Y);
-	const auto DU   = ClampFromMinusOneToOne(Size, Alpha);
+	const auto Size  = abs(BoxExtent.Y);
+	const auto DU    = ClampFromMinusOneToOne(Size, Alpha);
 	
 	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("------------"));
 	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("ViewDirection: %s"), *ViewDirection.ToString());
@@ -710,8 +752,8 @@ float BotNavigationSystem::GetDV(const FVector BoxCenter, const FVector BoxExten
 	const auto Dir = PuckPos - BoxCenter;
 	const auto Alpha = ViewDirection | Dir;
 	
-	const auto Size = abs(BoxExtent.X);
-	const auto DV   = ClampFromMinusOneToOne(Size, Alpha);
+	const auto Size  = abs(BoxExtent.X);
+	const auto DV    = ClampFromMinusOneToOne(Size, Alpha);
 	
 	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("------------"));
 	NAV_SYSTEM_LOG(NavigationSystem, Display, TEXT("ViewDirection: %s"), *ViewDirection.ToString());

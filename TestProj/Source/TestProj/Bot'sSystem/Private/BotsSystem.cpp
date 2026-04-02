@@ -28,6 +28,7 @@ void BotsSystem::Init(UWorld* World,
 					FPuckParam& PuckParams,
 					AGlobalCamera*& GlobalCamera,
 					ATriggerBox*& MatchAreaBox,
+					TArray<ATriggerBox*>& GoalsTriggerBoxes,
 					EIHMatchGameMode MatchGameMode,
 					ETeam GoalToTeam,
 					TArray<FGoalParams>& GoalsParams,
@@ -42,10 +43,11 @@ void BotsSystem::Init(UWorld* World,
 		UE_LOG(BotSystem, Error, TEXT("Init::PC is not find"));
 	}
 	CameraSpawn(World, GlobalCamera);
-	FindBoxActor(World, MatchAreaBox);
+	FindBoxActor(World, MatchAreaBox, GoalsTriggerBoxes);
 	UE_LOG(BotSystem, Display, TEXT("MatchMode: %s"), *UEnum::GetValueAsString(MatchGameMode));
 	
 	UBoxComponent* Box = Cast<UBoxComponent>(MatchAreaBox->GetCollisionComponent());
+	
 	
 	FVector BoxForward = Box->GetForwardVector();
 	
@@ -70,7 +72,7 @@ void BotsSystem::Init(UWorld* World,
 	}
 }
 
-void BotsSystem::FindBoxActor(UWorld* World, ATriggerBox*& MatchAreaBox)
+void BotsSystem::FindBoxActor(UWorld* World, ATriggerBox*& MatchAreaBox, TArray<ATriggerBox*>& GoalsTriggerBoxes)
 {
 	UE_LOG(BotSystem, Display, TEXT("<------------------------------------>"));
 	UE_LOG(BotSystem, Display, TEXT("---FindBoxActor---"));
@@ -82,6 +84,11 @@ void BotsSystem::FindBoxActor(UWorld* World, ATriggerBox*& MatchAreaBox)
 		{
 			MatchAreaBox = Cast<ATriggerBox>(FoundActor);
 			UE_LOG(BotSystem, Display, TEXT("FindBoxActor::TriggerBox has been found"));
+		}
+		else if (FoundActor->ActorHasTag("Goals"))
+		{
+			GoalsTriggerBoxes.AddUnique(Cast<ATriggerBox>(FoundActor));
+			UE_LOG(BotSystem, Display, TEXT("FindBoxActor::Goals has been found"));
 		}
 	}
 	if (MatchAreaBox == nullptr)
