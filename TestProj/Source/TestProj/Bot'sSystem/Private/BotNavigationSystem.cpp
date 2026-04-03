@@ -541,7 +541,7 @@ void BotNavigationSystem::BotPositionManagementNeutral(
 
 
 	const auto AngleForDefence = GetOwnAngleForDefence(AngleBetweenBots, CurrentDU, DV);								//remade
-	auto AngleForAttack  = GetOwnAngleForAttack(AngleBetweenBots, CurrentDU, DV, 60);				//new(?)
+	auto AngleForAttack  = GetOwnAngleForAttack(AngleBetweenBots, CurrentDU, DV, 60);						//new(?)
 
 	const auto OwnRightAngle   = AngleForDefence;
 	const auto OwnLeftAngle    = AngleForDefence;
@@ -550,11 +550,11 @@ void BotNavigationSystem::BotPositionManagementNeutral(
 	const auto MainRadiusForDefence = GetMainRadiusForDefence(Radius, DU, DV, 500);
 
 	const auto OwnRightRadius = MainRadiusForDefence + GetOwnRadiusForDefence(DU, DV, 800);						//new
-	const auto OwnLeftRadius  = MainRadiusForDefence + GetOwnRadiusForDefence(DU, DV, 800, false);		//new
+	const auto OwnLeftRadius  = MainRadiusForDefence + GetOwnRadiusForDefence(DU, DV, 800, false);			//new
 
 	
-	const auto MainAngleForAttack  = GetMainVectorAngle(AngleBetweenBots, DU, DV, ETeamTactic::Attack);			//remade
-	const auto MainAngleForDefence = GetMainVectorAngle(AngleBetweenBots, CurrentDU, DV, ETeamTactic::Defence);	//remade
+	const auto MainAngleForAttack  = GetMainVectorAngle(AngleBetweenBots, DU, DV, ETeamTactic::Attack);					//remade
+	const auto MainAngleForDefence = GetMainVectorAngle(AngleBetweenBots, CurrentDU, DV, ETeamTactic::Defence);			//remade
 
 	const auto Direction = SectorDirection.RotateAngleAxis(MainAngleForAttack + MainAngleForDefence, FVector::UpVector);
 	
@@ -701,7 +701,6 @@ float BotNavigationSystem::GetMainRadiusForDefence(const float CurrentRadius, co
 	{
 		auto X = MinRadius + (CurrentRadius - MinRadius) * ((FMath::Cos(2 * PI * DV) + 1) / 2);
 		return X;
-		
 	}
 	return CurrentRadius;
 }

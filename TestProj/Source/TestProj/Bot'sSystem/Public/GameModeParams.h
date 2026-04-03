@@ -5,6 +5,7 @@
 #include "MatchGameMode.h"
 #include "PuckParam.h"
 #include "Rules.h"
+#include "Tactics.h"
 #include "Zone.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/TriggerBox.h"
@@ -17,7 +18,7 @@ struct FGameModeParams
 {
 	GENERATED_BODY()
 	
-	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
+	UPROPERTY()
 	TArray<FBotParam> BotsParamArray;
 	
 	UPROPERTY()
@@ -26,7 +27,7 @@ struct FGameModeParams
 	UPROPERTY(Category=ActorBots, EditAnywhere, BlueprintReadWrite)
 	bool bUseActorBots = true;
 
-	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
+	UPROPERTY()
 	FPuckParam PuckParam;
 
 	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
@@ -34,6 +35,12 @@ struct FGameModeParams
 	
 	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
 	EIHMatchGameMode MatchGameMode = EIHMatchGameMode::MatchGameMode_3x3;
+	
+	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
+	ETeamTactic Team1Tactic = ETeamTactic::None;
+	
+	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
+	ETeamTactic Team2Tactic = ETeamTactic::None;
 	
 	UPROPERTY(Category=Parameters, EditAnywhere, BlueprintReadWrite)
 	ETeam GoalToTeam = ETeam::Team1;
